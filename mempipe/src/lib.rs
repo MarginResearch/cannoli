@@ -362,6 +362,7 @@ impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             if tmp[0] != key || tmp[1] != size_of::<usize>() as u64 ||
                     tmp[2] != CHUNK_SIZE  as u64 ||
                     tmp[3] != NUM_BUFFERS as u64 {
+                return Err(Error::PipeMismatch);
             }
         }
 
@@ -444,7 +445,7 @@ fn test() {
             // Create accessor pipe
             s.spawn(move || {
                 let mut pipe =
-                    RecvPipe::<CHUNK_SIZE, 4>::open("moose", key).unwrap();
+                    RecvPipe::<CHUNK_SIZE, 4>::open("moose", key + 1).unwrap();
 
                 let mut rxed = 0;
                 let it = std::time::Instant::now();
