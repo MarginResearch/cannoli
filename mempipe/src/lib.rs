@@ -285,6 +285,13 @@ impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
     /// Send raw data, this takes the length sent, and assumes it is in-bounds
     /// and the bytes referred to have been initialized
+    ///
+    /// # Safety
+    ///
+    /// The data pointed to by [`Self::get_raw`] needs to be initialized at
+    /// offset 0 for at least `size` bytes for this to be safe. This assumes
+    /// `size` bytes have been initialized by the caller
+    ///
     #[inline]
     pub unsafe fn send_raw(mut self, size: usize) {
         // Update the number of bytes written, we'll send it on drop!
