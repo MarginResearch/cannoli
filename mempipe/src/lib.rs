@@ -432,41 +432,26 @@ impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 }
 
 #[test]
-fn test() {
-    const NUM_CHUNKS: usize = 1024 * 1024;
-    const CHUNK_SIZE: usize = 128 * 1024;
+fn pipe_config() -> Result<()> {
+    let (_pipe, key) =
+        SendPipe::<1, 2>::create("moose")?;
 
-    std::thread::scope(|s| {
-        s.spawn(|| {
-            // Create the pipe
-            let (mut pipe, key) =
-                SendPipe::<CHUNK_SIZE, 4>::create("moose").unwrap();
+    // We should fail to make a pipe with a mismatched key
+    assert!(matches!(RecvPipe::<1, 2>::open("moose", key.wrapping_add(1)),
+        Err(Error::PipeMismatch)),
+        "Whoa, was able to attach to a pipe with the wrong key");
 
-            // Create accessor pipe
-            s.spawn(move || {
-                let mut pipe =
-                    RecvPipe::<CHUNK_SIZE, 4>::open("moose", key + 1).unwrap();
+    // We should fail to make a pipe with a mismatched size
+    assert!(matches!(RecvPipe::<3, 2>::open("moose", key),
+        Err(Error::PipeMismatch)),
+        "Whoa, was able to attach to a pipe with the wrong size");
 
-                let mut rxed = 0;
-                let it = std::time::Instant::now();
-                for _ in 0..NUM_CHUNKS {
-                    pipe.recv(|result| {
-                        rxed += result.len();
-                    });
-                }
-                let elapsed = it.elapsed().as_secs_f64();
+    // We should fail to make a pipe with a mismatched number of buffers
+    assert!(matches!(RecvPipe::<1, 3>::open("moose", key),
+        Err(Error::PipeMismatch)),
+        "Whoa, was able to attach to a pipe with the wrong size");
 
-                println!("{:12.8} GiB/sec",
-                    rxed as f64 / 1024. / 1024. / 1024. / elapsed);
-            });
-
-            // Request a buffer
-            for _ in 0..NUM_CHUNKS {
-                const TMP: [u8; CHUNK_SIZE] = [0; CHUNK_SIZE];
-                let buf = pipe.alloc_buffer();
-                buf.send(TMP);
-            }
-        });
-    });
+    // The correct settings should work
+    RecvPipe::<1, 2>::open("moose", key).map(|_| ())
 }
 
