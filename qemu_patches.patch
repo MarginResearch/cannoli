@@ -1,0 +1,349 @@
+From 8dc557b5d1dfc1a7a5d46a093b63ca86302bc155 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Wed, 11 May 2022 07:53:06 -0700
+Subject: [PATCH] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+
+---
+ include/tcg/tcg.h         |  10 +++
+ linux-user/main.c         |  46 ++++++++++++
+ tcg/i386/tcg-target.c.inc | 145 ++++++++++++++++++++++++++++++++++++++
+ tcg/tcg.c                 |  34 +++++++++
+ 4 files changed, 235 insertions(+)
+
+diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
+index 26a70526f1..063c4c18d1 100644
+--- a/include/tcg/tcg.h
++++ b/include/tcg/tcg.h
+@@ -35,6 +35,16 @@
+ #include "tcg-target.h"
+ #include "tcg/tcg-cond.h"
+ 
++#ifdef CONFIG_LINUX_USER
++#define CANNOLI
++#ifdef CANNOLI
++#include "/home/pleb/cannoli/qemu_library/ffi/cannoli.h"
++
++// Defined in `linux-user/main.c`
++extern Cannoli *cannoli;
++#endif // CANNOLI
++#endif // CONFIG_LINUX_USER
++
+ /* XXX: make safe guess about sizes */
+ #define MAX_OP_PER_INSTR 266
+ 
+diff --git a/linux-user/main.c b/linux-user/main.c
+index 7ca48664e4..481f33e121 100644
+--- a/linux-user/main.c
++++ b/linux-user/main.c
+@@ -54,6 +54,10 @@
+ #include "loader.h"
+ #include "user-mmap.h"
+ 
++#ifdef CANNOLI
++#include <dlfcn.h>
++#endif
++
+ #ifndef AT_FLAGS_PRESERVE_ARGV0
+ #define AT_FLAGS_PRESERVE_ARGV0_BIT 0
+ #define AT_FLAGS_PRESERVE_ARGV0 (1 << AT_FLAGS_PRESERVE_ARGV0_BIT)
+@@ -86,6 +90,13 @@ static bool enable_strace;
+ static int last_log_mask;
+ static const char *last_log_filename;
+ 
++#ifdef CANNOLI
++/*
++ * Pointer to bindings registed by `query_version` in Cannoli
++ */
++Cannoli *cannoli;
++#endif
++
+ /*
+  * When running 32-on-64 we should make sure we can fit all of the possible
+  * guest address space into a contiguous chunk of virtual host memory.
+@@ -260,6 +271,37 @@ static void handle_arg_log_filename(const char *arg)
+     last_log_filename = arg;
+ }
+ 
++#ifdef CANNOLI
++static void handle_arg_cannoli(const char *arg)
++{
++    // Initialize the Cannoli library
++    void *cannoli_lib = dlopen(arg, RTLD_NOW);
++    if(!cannoli_lib) {
++        fprintf(stderr, "Cannoli: Failed to load library \"%s\"\n", dlerror());
++        exit(EXIT_FAILURE);
++    }
++
++    // Get the entry point for Cannoli
++    Cannoli* (*query_version)(void) = dlsym(cannoli_lib, CANNOLI_ENTRY);
++    if(!query_version) {
++        fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
++            dlerror());
++        exit(EXIT_FAILURE);
++    }
++
++    // Query binding information
++    cannoli = query_version();
++
++    // Check version
++    if(cannoli->version != CANNOLI_VERSION) {
++        fprintf(stderr, "Cannoli: Version mismatch, expected %" PRIx64
++            ", got %" PRIx64 "\n",
++            CANNOLI_VERSION, cannoli->version);
++        exit(EXIT_FAILURE);
++    }
++}
++#endif
++
+ static void handle_arg_set_env(const char *arg)
+ {
+     char *r, *p, *token;
+@@ -463,6 +505,10 @@ static const struct qemu_argument arg_table[] = {
+      "range[,...]","filter logging based on address range"},
+     {"D",          "QEMU_LOG_FILENAME", true, handle_arg_log_filename,
+      "logfile",     "write logs to 'logfile' (default stderr)"},
++#ifdef CANNOLI
++    {"cannoli",    "QEMU_CANNOLI" ,    true,  handle_arg_cannoli,
++     "cannoli.so", "Falk's Cannoli fast JIT hooks"},
++#endif
+     {"p",          "QEMU_PAGESIZE",    true,  handle_arg_pagesize,
+      "pagesize",   "set the host page size to 'pagesize'"},
+     {"singlestep", "QEMU_SINGLESTEP",  false, handle_arg_singlestep,
+diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
+index b5c6159853..0e7d88c67e 100644
+--- a/tcg/i386/tcg-target.c.inc
++++ b/tcg/i386/tcg-target.c.inc
+@@ -45,9 +45,11 @@ static const int tcg_target_reg_alloc_order[] = {
+ #if TCG_TARGET_REG_BITS == 64
+     TCG_REG_RBP,
+     TCG_REG_RBX,
++#ifndef CANNOLI
+     TCG_REG_R12,
+     TCG_REG_R13,
+     TCG_REG_R14,
++#endif
+     TCG_REG_R15,
+     TCG_REG_R10,
+     TCG_REG_R11,
+@@ -2245,9 +2247,36 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
+         tcg_out_test_alignment(s, true, addrlo, addrhi, a_bits);
+     }
+ 
++#ifdef CANNOLI
++    tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_R14, addrlo);
++#endif // CANNOLI
++
+     tcg_out_qemu_ld_direct(s, datalo, datahi, addrlo, x86_guest_base_index,
+                            x86_guest_base_offset, x86_guest_base_seg,
+                            is64, opc);
++
++#ifdef CANNOLI
++    if(cannoli && cannoli->lift_memop) {
++        // Should be large enough for any reasonable shellcode
++        uint8_t shellcode[1024];
++
++        // Invoke lifting callback
++        size_t shellcode_size = cannoli->lift_memop(
++            0, datalo, TCG_REG_R14, opc & MO_SIZE, shellcode,
++            sizeof(shellcode));
++
++        // Make sure the SO library author is not being naughty ;)
++        if(shellcode_size > sizeof(shellcode)) {
++            fprintf(stderr, "Cannoli: Shellcode too large\n");
++            exit(EXIT_FAILURE);
++        }
++
++        // Inject the shellcode into the JIT stream
++        for(size_t ii = 0; ii < shellcode_size; ii++) {
++            tcg_out8(s, shellcode[ii]);
++        }
++    }
++#endif // CANNOLI
+ #endif
+ }
+ 
+@@ -2336,6 +2365,28 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
+     add_qemu_ldst_label(s, false, is64, oi, datalo, datahi, addrlo, addrhi,
+                         s->code_ptr, label_ptr);
+ #else
++#ifdef CANNOLI
++    if(cannoli && cannoli->lift_memop) {
++        // Should be large enough for any reasonable shellcode
++        uint8_t shellcode[1024];
++
++        // Invoke lifting callback
++        size_t shellcode_size = cannoli->lift_memop(
++            1, datalo, addrlo, opc & MO_SIZE, shellcode, sizeof(shellcode));
++
++        // Make sure the SO library author is not being naughty ;)
++        if(shellcode_size > sizeof(shellcode)) {
++            fprintf(stderr, "Cannoli: Shellcode too large\n");
++            exit(EXIT_FAILURE);
++        }
++
++        // Inject the shellcode into the JIT stream
++        for(size_t ii = 0; ii < shellcode_size; ii++) {
++            tcg_out8(s, shellcode[ii]);
++        }
++    }
++#endif // CANNOLI
++
+     a_bits = get_alignment_bits(opc);
+     if (a_bits) {
+         tcg_out_test_alignment(s, false, addrlo, addrhi, a_bits);
+@@ -4021,6 +4072,57 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+         tcg_out_push(s, tcg_target_callee_save_regs[i]);
+     }
+ 
++#ifdef CANNOLI
++    if(cannoli && cannoli->jit_entry) {
++        // Save all of the registers which are caller-saved. In theory we could
++        // be a bit more specific here, but this allows us to not interfere
++        // with any shenanigans that QEMU might do now, or in the future. This
++        // gives us our own environment to run in where we don't have to worry
++        // about specifics
++        //
++        // x86-64 SYS-V ABI:
++        // Callee-saved: rbp, rbx, r12, r13, r14, r15, rsp
++        // Caller-saved: rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11
++        tcg_out_push(s, TCG_REG_RAX);
++        tcg_out_push(s, TCG_REG_RDI);
++        tcg_out_push(s, TCG_REG_RSI);
++        tcg_out_push(s, TCG_REG_RDX);
++        tcg_out_push(s, TCG_REG_RCX);
++        tcg_out_push(s, TCG_REG_R8);
++        tcg_out_push(s, TCG_REG_R9);
++        tcg_out_push(s, TCG_REG_R10);
++        tcg_out_push(s, TCG_REG_R11);
++
++        // Make some room on the stack for the 3 64-bit return values, but also
++        // align the stack to a 16-byte boundary so it matches the x64 ABI
++        tcg_out_addi(s, TCG_REG_RSP, -32);
++
++        // Load a pointer to the temporary storage for the (u64, u64) into the
++        // first argument to `jit_entry`
++        tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RDI, TCG_REG_RSP);
++
++        tcg_out_call(s, (void*)cannoli->jit_entry);
++
++        // Load the temporary values returned from `jit_entry`. These are the
++        // values for our registers we have full control over in the JIT
++        tcg_out_ld(s, TCG_TYPE_PTR, TCG_REG_R12, TCG_REG_RSP, 0x00);
++        tcg_out_ld(s, TCG_TYPE_PTR, TCG_REG_R13, TCG_REG_RSP, 0x08);
++        tcg_out_ld(s, TCG_TYPE_PTR, TCG_REG_R14, TCG_REG_RSP, 0x10);
++
++        // Restore the stack
++        tcg_out_addi(s, TCG_REG_RSP, 32);
++        tcg_out_pop(s, TCG_REG_R11);
++        tcg_out_pop(s, TCG_REG_R10);
++        tcg_out_pop(s, TCG_REG_R9);
++        tcg_out_pop(s, TCG_REG_R8);
++        tcg_out_pop(s, TCG_REG_RCX);
++        tcg_out_pop(s, TCG_REG_RDX);
++        tcg_out_pop(s, TCG_REG_RSI);
++        tcg_out_pop(s, TCG_REG_RDI);
++        tcg_out_pop(s, TCG_REG_RAX);
++    }
++#endif
++
+ #if TCG_TARGET_REG_BITS == 32
+     tcg_out_ld(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_ESP,
+                (ARRAY_SIZE(tcg_target_callee_save_regs) + 1) * 4);
+@@ -4066,6 +4168,49 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+     if (have_avx2) {
+         tcg_out_vex_opc(s, OPC_VZEROUPPER, 0, 0, 0, 0);
+     }
++
++#ifdef CANNOLI
++    if(cannoli && cannoli->jit_exit) {
++        // Save all of the registers which are caller-saved. In theory we could
++        // be a bit more specific here, but this allows us to not interfere
++        // with any shenanigans that QEMU might do now, or in the future. This
++        // gives us our own environment to run in where we don't have to worry
++        // about specifics
++        //
++        // x86-64 SYS-V ABI:
++        // Callee-saved: rbp, rbx, r12, r13, r14, r15, rsp
++        // Caller-saved: rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11
++        tcg_out_push(s, TCG_REG_RAX);
++        tcg_out_push(s, TCG_REG_RDI);
++        tcg_out_push(s, TCG_REG_RSI);
++        tcg_out_push(s, TCG_REG_RDX);
++        tcg_out_push(s, TCG_REG_RCX);
++        tcg_out_push(s, TCG_REG_R8);
++        tcg_out_push(s, TCG_REG_R9);
++        tcg_out_push(s, TCG_REG_R10);
++        tcg_out_push(s, TCG_REG_R11);
++
++        // Load the 3 controlled registers into the first 3 arguments of the
++        // JIT exit function
++        tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RDI, TCG_REG_R12);
++        tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RSI, TCG_REG_R13);
++        tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RDX, TCG_REG_R14);
++
++        tcg_out_call(s, (void*)cannoli->jit_exit);
++
++        // Restore the stack
++        tcg_out_pop(s, TCG_REG_R11);
++        tcg_out_pop(s, TCG_REG_R10);
++        tcg_out_pop(s, TCG_REG_R9);
++        tcg_out_pop(s, TCG_REG_R8);
++        tcg_out_pop(s, TCG_REG_RCX);
++        tcg_out_pop(s, TCG_REG_RDX);
++        tcg_out_pop(s, TCG_REG_RSI);
++        tcg_out_pop(s, TCG_REG_RDI);
++        tcg_out_pop(s, TCG_REG_RAX);
++    }
++#endif
++
+     for (i = ARRAY_SIZE(tcg_target_callee_save_regs) - 1; i >= 0; i--) {
+         tcg_out_pop(s, tcg_target_callee_save_regs[i]);
+     }
+diff --git a/tcg/tcg.c b/tcg/tcg.c
+index 0f9cfe96f2..739a4641c3 100644
+--- a/tcg/tcg.c
++++ b/tcg/tcg.c
+@@ -4350,6 +4350,40 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+ #endif
+                 s->gen_insn_data[num_insns][i] = a;
+             }
++
++#ifdef CANNOLI
++            // First `insn_start` variable is the PC of the instruction.
++            // It may be encoded as 2 32-bit ints when emulating a
++            // larger-than-native architecture than the host of QEMU.
++            //
++            // We let the code above us handle that decoding, thus we just
++            // access the `gen_insn_data` ourselves
++            if(cannoli) {
++                if(cannoli->lift_instruction) {
++                    // Should be large enough for any reasonable shellcode
++                    uint8_t shellcode[1024];
++
++                    // Get the PC
++                    target_ulong pc = s->gen_insn_data[num_insns][0];
++
++                    // Invoke lifting callback
++                    size_t shellcode_size =
++                        cannoli->lift_instruction(
++                            pc, shellcode, sizeof(shellcode));
++
++                    // Make sure the SO library author is not being naughty ;)
++                    if(shellcode_size > sizeof(shellcode)) {
++                        fprintf(stderr, "Cannoli: Shellcode too large\n");
++                        exit(EXIT_FAILURE);
++                    }
++
++                    // Inject the shellcode into the JIT stream
++                    for(size_t ii = 0; ii < shellcode_size; ii++) {
++                        tcg_out8(s, shellcode[ii]);
++                    }
++                }
++            }
++#endif
+             break;
+         case INDEX_op_discard:
+             temp_dead(s, arg_temp(op->args[0]));
+-- 
+2.35.1
+
