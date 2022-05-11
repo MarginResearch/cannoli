@@ -1,3 +1,6 @@
+//! Handles generation of the FFI bindings we need to build the Rust side of
+//! Cannoli
+
 use std::path::PathBuf;
 
 fn main() {

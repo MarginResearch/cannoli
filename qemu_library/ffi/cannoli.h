@@ -31,8 +31,17 @@ struct Cannoli32 {
     /// are generated
     size_t (*lift_instruction)(uint32_t pc, uint8_t *buf, size_t buf_size);
     
+    /// Invoked from QEMU when entering the JIT. This provides an opportunity
+    /// for us to introduce some register state to the JIT.
+    ///
+    /// `out` points to an array of 3 `size_t`s which should be filled with the
+    /// values for `r12`, `r13`, and `r14`, respectively
     void (*jit_entry)(size_t *out);
-    void (*jit_exit)(size_t reg_a, size_t reg_b, size_t reg_c);
+
+    /// Invoked from QEMU when exiting the JIT. This is then provided with the
+    /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
+    /// user an opportunity to observe the changes to the registers
+    void (*jit_exit)(size_t r12, size_t r13, size_t r14);
 };
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
@@ -55,8 +64,17 @@ struct Cannoli64 {
     /// are generated
     size_t (*lift_instruction)(uint64_t pc, uint8_t *buf, size_t buf_size);
     
+    /// Invoked from QEMU when entering the JIT. This provides an opportunity
+    /// for us to introduce some register state to the JIT.
+    ///
+    /// `out` points to an array of 3 `size_t`s which should be filled with the
+    /// values for `r12`, `r13`, and `r14`, respectively
     void (*jit_entry)(size_t *out);
-    void (*jit_exit)(size_t reg_a, size_t reg_b, size_t reg_c);
+
+    /// Invoked from QEMU when exiting the JIT. This is then provided with the
+    /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
+    /// user an opportunity to observe the changes to the registers
+    void (*jit_exit)(size_t r12, size_t r13, size_t r14);
 };
 
 // If we're building in QEMU these will be defined and we'll make an alias for

@@ -1,3 +1,6 @@
+//! Client for handling the IPC messages streamed from QEMU while it is
+//! executing
+
 #![feature(array_chunks)]
 
 use mempipe::RecvPipe;
@@ -14,8 +17,8 @@ fn main() {
 
     loop {
         pipe.recv(|x| {
-            for chunk in x.array_chunks::<4>() {
-                let pc = u32::from_le_bytes(*chunk);
+            for _chunk in x.array_chunks::<4>() {
+                let _pc = u32::from_le_bytes(*_chunk);
             }
         });
     }
