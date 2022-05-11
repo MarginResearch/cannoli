@@ -1,8 +1,6 @@
 //! We just use a disgusting assembly macro to auto-generate all of these
 //! functions from a single template.
 
-use std::ptr::addr_of;
-
 extern {
     static cannoli_memhook_eax_eax:     u8;
     static cannoli_memhook_eax_eax_end: u8;
