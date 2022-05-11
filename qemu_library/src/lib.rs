@@ -5,8 +5,10 @@
 #![feature(asm_const, maybe_uninit_slice, inline_const, naked_functions)]
 #![feature(asm_sym)]
 
-use std::cell::RefCell;
+use std::io::Write;
+use std::net::TcpStream;
 use std::mem::{ManuallyDrop, size_of, size_of_val};
+use std::cell::RefCell;
 use mempipe::{SendPipe, ChunkWriter};
 
 /// Chunk size to use when streaming data over IPC
@@ -25,6 +27,9 @@ struct HookState {
     /// Pipe to use to send data out of QEMU to the processing process
     pipe: SendPipe<CHUNK_SIZE, NUM_BUFFERS>,
 
+    /// Connection to the server for sending metadata needed to establish IPC
+    _server: TcpStream,
+
     /// Currently active buffer. This is set upon JIT entries, and taken on JIT
     /// exits.
     ///
@@ -36,10 +41,21 @@ struct HookState {
 
 impl Default for HookState {
     fn default() -> Self {
+        // Create a new pipe
+        let pipe = SendPipe::create().expect("Failed to create pipe");
+
+        // Connect to the server
+        let mut server = TcpStream::connect("127.0.0.1:11458")
+            .expect("Failed to connect to Cannoli server");
+
+        // Send the uid to the server
+        server.write_all(&pipe.uid().to_le_bytes())
+            .expect("Failed to send UID to server");
+
         Self {
             active_buffer: None,
-            pipe: SendPipe::create("scoop")
-                .expect("Failed to create pipe for QemuHook"),
+            _server: server,
+            pipe,
         }
     }
 }

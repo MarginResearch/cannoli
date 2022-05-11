@@ -24,21 +24,17 @@
 //! for the consumers that are polling metadata, waiting for data to be given
 //! to them.
 
-#![no_std]
-#![feature(maybe_uninit_uninit_array, array_from_fn, alloc_c_string)]
+#![feature(maybe_uninit_uninit_array, array_from_fn)]
 #![feature(inline_const)]
 
-extern crate alloc;
-
-use core::ptr::addr_of_mut;
-use core::mem::{MaybeUninit, size_of, size_of_val};
-use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicUsize, AtomicU64, Ordering};
-use alloc::vec::Vec;
-use alloc::ffi::{CString, NulError};
+use std::ptr::addr_of_mut;
+use std::mem::{MaybeUninit, size_of, size_of_val};
+use std::cell::UnsafeCell;
+use std::sync::atomic::{AtomicBool, AtomicUsize, AtomicU64, Ordering};
+use std::ffi::{CString, NulError};
 
 /// A wrapper around the [`Error`] type
-type Result<T> = core::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 /// Error types for this module
 #[derive(Debug)]
@@ -94,6 +90,9 @@ struct RawMemPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
     /// the sender and receiver are using the same constants
     num_buffers: u64,
 
+    /// Unique identifier for the pipe
+    uid: u64,
+
     /// Boolean tracking whether or not each corresponding buffer is owned by
     /// the client. In our case, the client is the program who opened the
     /// existing shared memory buffer.
@@ -119,25 +118,33 @@ struct RawMemPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
 /// The sending side of a pipe. To create one, call [`SendPipe::create`] with
 /// a name which will be used to access this pipe.
 pub struct SendPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
+    /// UID for this pipe
+    uid: u64,
+
     /// Reference to the memory pipe
     mem_pipe: *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>,
 }
 
+/// Get the filename for a given `uid`
+fn filename_from_uid(uid: u64) -> Result<CString> {
+    // Create a [`CString`] of the name to hexlify and null-terminate it
+    CString::new(format!("cannoli_{:016x}", uid)).map_err(Error::CString)
+}
+
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         SendPipe<CHUNK_SIZE, NUM_BUFFERS> {
-    /// Create a pipe with the given `name`
-    ///
-    /// This will delete the shared memory with `name`, and then create it
-    /// exclusively. This will get us a unique inode atomically from the kernel
-    /// for this given name.
-    pub fn create(name: impl Into<Vec<u8>>) -> Result<Self> {
+    /// Create a pipe
+    pub fn create() -> Result<Self> {
         // Make sure settings are sane
         if NUM_BUFFERS == 0 || CHUNK_SIZE == 0 {
             return Err(Error::InvalidPipeConfiguration);
         }
 
-        // Convert the Rust name into a `CString` for the current system
-        let cs = CString::new(name).map_err(Error::CString)?;
+        // Generate a random name
+        let uid = rand::random::<u64>();
+
+        // Get the filename
+        let cs = filename_from_uid(uid)?;
 
         // Delete the shared memory before we create it to make sure we
         // exclusively create it
@@ -161,7 +168,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
         // Map the shared memory
         let mapped = unsafe {
-            libc::mmap(core::ptr::null_mut(),
+            libc::mmap(std::ptr::null_mut(),
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>(),
                 libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
                 shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
@@ -182,6 +189,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             addr_of_mut!((*mapped).num_buffers).write(NUM_BUFFERS as u64);
             addr_of_mut!((*mapped).usize_size)
                 .write(size_of::<usize>() as u64);
+            addr_of_mut!((*mapped).uid).write(uid);
             addr_of_mut!((*mapped).client_owned)
                 .write([const { AtomicBool::new(false) }; NUM_BUFFERS]);
             addr_of_mut!((*mapped).client_len)
@@ -194,7 +202,12 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             // as [`MaybeUninit`]
         }
 
-        Ok(Self { mem_pipe: mapped })
+        Ok(Self { mem_pipe: mapped, uid })
+    }
+
+    /// Get the UID for the pipe
+    pub fn uid(&self) -> u64 {
+        self.uid
     }
 
     /// Allocate a buffer from the pipe
@@ -237,8 +250,13 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Drop for SendPipe<CHUNK_SIZE, NUM_BUFFERS> {
     fn drop(&mut self) {
-        // Unmap the memory we mapped
         unsafe {
+            // Delete the file we created
+            let cs = filename_from_uid(self.uid)
+                .expect("Failed to get filename for pipe");
+            libc::shm_unlink(cs.as_ptr());
+
+            // Unmap the memory we mapped
             assert!(libc::munmap(self.mem_pipe as *mut _,
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>()) == 0,
                 "Failed to munmap() IPC for SendPipe");
@@ -345,23 +363,30 @@ pub struct RecvPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
 
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {
-    /// Open a pipe with a given `name`
-    pub fn open(name: impl Into<Vec<u8>>) -> Result<Self> {
+    /// Open a pipe with the given `uid`
+    pub fn open(uid: u64) -> Result<Self> {
         // Make sure settings are sane
         if NUM_BUFFERS == 0 || CHUNK_SIZE == 0 {
             return Err(Error::InvalidPipeConfiguration);
         }
 
-        // Convert the Rust name into a `CString` for the current system
-        let cs = CString::new(name).map_err(Error::CString)?;
+        // Get the filename
+        let cs = filename_from_uid(uid)?;
 
         // Open shared memory, only if it already exists
         let shm = unsafe { libc::shm_open(cs.as_ptr(), libc::O_RDWR, 0) };
         if shm == -1 { return Err(Error::ShmOpen); }
 
+        // Delete the file, it's SPSC. This isn't atomic or for safety, but
+        // this is just the earliest we can delete the file so we don't have
+        // to keep track of it anymore
+        //
+        // This also gives us the lowest possible chance of leaking the shm
+        unsafe { libc::shm_unlink(cs.as_ptr()); }
+
         // Read the configuration of the chunk
         unsafe {
-            let mut tmp = [0u64; 4];
+            let mut tmp = [0u64; 5];
 
             // Read the header, which we can use to verify this pipe matches
             // what we expect
@@ -375,7 +400,8 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             if tmp[0] != MEMPIPE_MAGIC ||
                     tmp[1] != size_of::<usize>() as u64 ||
                     tmp[2] != CHUNK_SIZE  as u64 ||
-                    tmp[3] != NUM_BUFFERS as u64 {
+                    tmp[3] != NUM_BUFFERS as u64 ||
+                    tmp[4] != uid {
                 libc::close(shm);
                 return Err(Error::PipeMismatch);
             }
@@ -383,7 +409,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
         // Map the shared memory
         let mapped = unsafe {
-            libc::mmap(core::ptr::null_mut(),
+            libc::mmap(std::ptr::null_mut(),
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>(),
                 libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
                 shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
@@ -404,49 +430,46 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         })
     }
 
-    /// Wait to recieve the next message, then invoke the closure with a slice
-    /// to the data which was received
-    pub fn recv(&mut self, mut func: impl FnMut(&[u8])) {
+    /// Attempt to receive data from the pipe, invoking the closure only if
+    /// data was ready
+    pub fn try_recv(&mut self, mut func: impl FnMut(&[u8])) {
         // Get the pipe
         let pipe = unsafe { &*self.mem_pipe };
 
-        // Wait forever
-        loop {
-            // Look for a filled in buffer
-            for ii in 0..NUM_BUFFERS {
-                // If it's not client owned, skip it
-                if !pipe.client_owned[ii].load(Ordering::Acquire) {
-                    continue;
-                }
-
-                // It's client owned, make sure it's the sequence we expect
-                if self.seq != pipe.client_seq[ii].load(Ordering::Relaxed) {
-                    continue;
-                }
-
-                // Got the sequence we wanted, get the length
-                let length = pipe.client_len[ii].load(Ordering::Relaxed);
-
-                // Get a slice to the data
-                let data = unsafe {
-                    core::slice::from_raw_parts(
-                        UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
-                        length)
-                };
-
-                // Invoke the callback, giving the user access to the data
-                // temporarily before we give it back to the sender
-                func(data);
-
-                // Move ownership back to the sender
-                pipe.client_owned[ii].store(false, Ordering::Release);
-
-                // Update sequence we expect
-                self.seq = self.seq.wrapping_add(1);
-
-                // All done!
-                return;
+        // Look for a filled in buffer
+        for ii in 0..NUM_BUFFERS {
+            // If it's not client owned, skip it
+            if !pipe.client_owned[ii].load(Ordering::Acquire) {
+                continue;
             }
+
+            // It's client owned, make sure it's the sequence we expect
+            if self.seq != pipe.client_seq[ii].load(Ordering::Relaxed) {
+                continue;
+            }
+
+            // Got the sequence we wanted, get the length
+            let length = pipe.client_len[ii].load(Ordering::Relaxed);
+
+            // Get a slice to the data
+            let data = unsafe {
+                std::slice::from_raw_parts(
+                    UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
+                    length)
+            };
+
+            // Invoke the callback, giving the user access to the data
+            // temporarily before we give it back to the sender
+            func(data);
+
+            // Move ownership back to the sender
+            pipe.client_owned[ii].store(false, Ordering::Release);
+
+            // Update sequence we expect
+            self.seq = self.seq.wrapping_add(1);
+
+            // All done!
+            return;
         }
     }
 }
@@ -454,6 +477,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Drop for RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {
     fn drop(&mut self) {
+        // Delete our file
         // Unmap the memory we mapped
         unsafe {
             assert!(libc::munmap(self.mem_pipe as *mut _,
@@ -465,25 +489,26 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
 #[test]
 fn pipe_config() -> Result<()> {
-    let _pipe = SendPipe::<1, 2>::create("moose")?;
-
     // We should fail to make a pipe with a mismatched size
-    assert!(matches!(RecvPipe::<3, 2>::open("moose"),
+    let pipe = SendPipe::<1, 2>::create()?;
+    assert!(matches!(RecvPipe::<3, 2>::open(pipe.uid()),
         Err(Error::PipeMismatch)),
         "Whoa, was able to attach to a pipe with the wrong size");
 
     // We should fail to make a pipe with a mismatched number of buffers
-    assert!(matches!(RecvPipe::<1, 3>::open("moose"),
+    let pipe = SendPipe::<1, 2>::create()?;
+    assert!(matches!(RecvPipe::<1, 3>::open(pipe.uid()),
         Err(Error::PipeMismatch)),
         "Whoa, was able to attach to a pipe with the wrong size");
 
     // The correct settings should work
-    RecvPipe::<1, 2>::open("moose").map(|_| ())
+    let pipe = SendPipe::<1, 2>::create()?;
+    RecvPipe::<1, 2>::open(pipe.uid()).map(|_| ())
 }
 
 #[test]
 fn large_stack_config() -> Result<()> {
-    let _pipe = SendPipe::< { 1024 * 1024 * 1024 }, 2>::create("moose2")?;
+    let _pipe = SendPipe::< { 1024 * 1024 * 1024 }, 2>::create()?;
     Ok(())
 }
 
