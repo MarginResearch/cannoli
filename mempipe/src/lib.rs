@@ -432,12 +432,14 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
     /// Attempt to receive data from the pipe, invoking the closure only if
     /// data was ready
-    pub fn try_recv(&mut self, mut func: impl FnMut(&[u8])) {
+    pub fn try_recv<E>(&mut self,
+        mut func: impl FnMut(&[u8]) -> std::result::Result<(), E>
+    ) -> std::result::Result<(), E> {
         // Get the pipe
         let pipe = unsafe { &*self.mem_pipe };
 
         // Look for a filled in buffer
-        for ii in 0..NUM_BUFFERS {
+        'search_buffers: for ii in 0..NUM_BUFFERS {
             // If it's not client owned, skip it
             if !pipe.client_owned[ii].load(Ordering::Acquire) {
                 continue;
@@ -460,17 +462,18 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
             // Invoke the callback, giving the user access to the data
             // temporarily before we give it back to the sender
-            func(data);
+            func(data)?;
 
             // Move ownership back to the sender
             pipe.client_owned[ii].store(false, Ordering::Release);
 
             // Update sequence we expect
             self.seq = self.seq.wrapping_add(1);
-
-            // All done!
-            return;
+            break 'search_buffers;
         }
+
+        // All done!
+        return Ok(());
     }
 }
 

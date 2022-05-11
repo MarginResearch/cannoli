@@ -4,6 +4,7 @@
 #define CANNOLI_BINDGEN
 
 typedef __UINT8_TYPE__  uint8_t;
+typedef __INT32_TYPE__  int32_t;
 typedef __UINT32_TYPE__ uint32_t;
 typedef __UINT64_TYPE__ uint64_t;
 typedef __SIZE_TYPE__   size_t;
@@ -42,6 +43,9 @@ struct Cannoli32 {
     /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
+
+    size_t (*lift_memop)(int32_t is_write, size_t data_reg, size_t addr_reg,
+        int32_t memop, uint8_t *buf, size_t buf_size);
 };
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
@@ -75,6 +79,9 @@ struct Cannoli64 {
     /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
+    
+    size_t (*lift_memop)(int32_t is_write, size_t data_reg, size_t addr_reg,
+        int32_t memop, uint8_t *buf, size_t buf_size);
 };
 
 // If we're building in QEMU these will be defined and we'll make an alias for
