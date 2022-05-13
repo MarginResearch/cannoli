@@ -14,10 +14,10 @@ use std::cell::RefCell;
 use mempipe::{SendPipe, ChunkWriter};
 
 /// Chunk size to use when streaming data over IPC
-const CHUNK_SIZE: usize = 16 * 1024;
+const CHUNK_SIZE: usize = 22 * 1024;
 
 /// Number of chunks to use with IPC
-const NUM_BUFFERS: usize = 16;
+const NUM_BUFFERS: usize = 8;
 
 // Pull in the FFI bindings we generated
 include!(concat!(env!("OUT_DIR"), "/ffi_bindings.rs"));

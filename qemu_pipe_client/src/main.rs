@@ -28,10 +28,10 @@ enum Error {
 }
 
 /// Chunk size to use when streaming data over IPC
-const CHUNK_SIZE: usize = 16 * 1024;
+const CHUNK_SIZE: usize = 22 * 1024;
 
 /// Number of chunks to use with IPC
-const NUM_BUFFERS: usize = 16;
+const NUM_BUFFERS: usize = 8;
 
 /// Opcodes we send over the IPC
 #[repr(u8)]
@@ -97,7 +97,7 @@ fn handle_client(mut stream: TcpStream, uid: u64) -> Result<()> {
     let mut tmp = [0u8; 4096];
 
     while !matches!(stream.read(&mut tmp), Ok(0)) {
-        for _ in 0..1000 {
+        for _ in 0..10000 {
             pipe.try_recv(|mut x| {
                 macro_rules! consume {
                     ($ty:ty) => {
@@ -111,6 +111,7 @@ fn handle_client(mut stream: TcpStream, uid: u64) -> Result<()> {
                     }
                 }
 
+                /*
                 while !x.is_empty() {
                     let opcode = consume!(u8)?;
                     let op = if opcode == Opcode::Exec32 as u8 {
@@ -149,8 +150,8 @@ fn handle_client(mut stream: TcpStream, uid: u64) -> Result<()> {
                         panic!("Unexpected opcode {:#x}", opcode);
                     };
 
-                    println!("{:x?}", op);
-                }
+                    //println!("{:x?}", op);
+                }*/
 
                 Ok(())
             })?;
