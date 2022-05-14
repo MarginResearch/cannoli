@@ -3,6 +3,6 @@
 members = [
     "mempipe",
     "qemu_library",
-    "qemu_pipe_client",
+    "client_library",
 ]
 

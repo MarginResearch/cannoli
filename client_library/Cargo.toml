@@ -1,5 +1,5 @@
 [package]
-name = "qemu_pipe_client"
+name = "client_library"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 mempipe = { path = "../mempipe" }
-libc = "*"
 

@@ -1,5 +1,6 @@
 //! MemPipe! A high-performance, low-latency, high-bandwidth way of streaming
-//! data from one core to another.
+//! data from one core to another. It's effectively just a ring buffer of
+//! buffers
 //!
 //! This crate is effectively a collection of buffers which are allocated
 //! in shared memory. The creator of the memory, [`SendPipe`], defines the
@@ -12,7 +13,7 @@
 //! with a sequence number and flagged as owned by the client.
 //!
 //! This design is for super low latency, allowing very small transfers while
-//! still getting high memory-bandwidth. This is originally being designed as
+//! still getting high memory bandwidth. This is originally being designed as
 //! a way to stream a log of control flow and register states from inside of
 //! QEMU's JIT into another processes memory. The goal is to block QEMU as
 //! little as possible, and thus latency and design of this structures memory
@@ -26,6 +27,12 @@
 
 #![feature(maybe_uninit_uninit_array, array_from_fn)]
 #![feature(inline_const)]
+
+// This code should work on effectively any UNIX system. It uses `shm_*` APIs
+// and `mmap`, and should be pretty portable between systems with these APIs
+#[cfg(not(target_family = "unix"))]
+compile_error!("Sorry, currently only UNIX-like systems are supported, you \
+    need support for shm_* and mmap APIs");
 
 use std::ptr::addr_of_mut;
 use std::mem::{MaybeUninit, size_of, size_of_val};
@@ -45,10 +52,10 @@ pub enum Error {
     /// Failed to open shared memory file
     ShmOpen,
 
-    /// Failed to [`ftruncate`] shared memory when it was created
+    /// Failed to [`libc::ftruncate`] shared memory when it was created
     SetMemorySize,
 
-    /// Failed to [`mmap`] memory
+    /// Failed to [`libc::mmap`] memory
     MapMemory,
 
     /// Attempted to connect to a pipe with a different configuration of
@@ -63,7 +70,7 @@ pub enum Error {
 
 /// Wrapper around a chunk
 #[repr(C, align(64))]
-struct Chunk<const CHUNK_SIZE: usize>(
+pub struct Chunk<const CHUNK_SIZE: usize>(
     [MaybeUninit<UnsafeCell<u8>>; CHUNK_SIZE]);
 
 /// Magic value put at the header of memory pipe structures
@@ -277,7 +284,7 @@ pub struct ChunkWriter<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
     /// [`Chunk`]'s raw data
     bytes: *mut u8,
 
-    /// Buffer index in the [`MemPipe`]
+    /// Buffer index in the [`RawMemPipe`]
     idx: usize,
 
     /// Tracks the number of initialized bytes in the chunk
@@ -358,8 +365,13 @@ pub struct RecvPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
     mem_pipe: *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>,
 
     /// Current sequence index we're looking for
-    seq: u64,
+    seq: AtomicU64,
 }
+
+unsafe impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Send for
+    RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {}
+unsafe impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Sync for
+    RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {}
 
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {
@@ -426,54 +438,53 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         // Return a reference to the memory pipe
         Ok(RecvPipe {
             mem_pipe: mapped,
-            seq:      0,
+            seq:      AtomicU64::new(0),
         })
     }
 
     /// Attempt to receive data from the pipe, invoking the closure only if
     /// data was ready
-    pub fn try_recv<E>(&mut self,
-        mut func: impl FnMut(&[u8]) -> std::result::Result<(), E>
-    ) -> std::result::Result<(), E> {
+    pub fn try_recv<F, E>(&self, mut func: F) -> std::result::Result<(), E>
+            where F: FnMut(&[u8]) -> std::result::Result<(), E> {
         // Get the pipe
         let pipe = unsafe { &*self.mem_pipe };
 
-        // Look for a filled in buffer
-        'search_buffers: for ii in 0..NUM_BUFFERS {
-            // If it's not client owned, skip it
-            if !pipe.client_owned[ii].load(Ordering::Acquire) {
-                continue;
+        let look = self.seq.fetch_add(1, Ordering::Relaxed);
+
+        loop {
+            // Look for a filled in buffer
+            for ii in 0..NUM_BUFFERS {
+                // If it's not client owned, skip it
+                if !pipe.client_owned[ii].load(Ordering::Acquire) {
+                    continue;
+                }
+
+                // It's client owned, make sure it's the sequence we expect
+                if look != pipe.client_seq[ii].load(Ordering::Relaxed) {
+                    continue;
+                }
+
+                // Got the sequence we wanted, get the length
+                let length = pipe.client_len[ii].load(Ordering::Relaxed);
+
+                // Get a slice to the data
+                let data = unsafe {
+                    std::slice::from_raw_parts(
+                        UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
+                        length)
+                };
+
+                // Invoke the callback, giving the user access to the data
+                // temporarily before we give it back to the sender
+                func(data)?;
+
+                // Move ownership back to the sender
+                pipe.client_owned[ii].store(false, Ordering::Release);
+
+                // Done
+                return Ok(());
             }
-
-            // It's client owned, make sure it's the sequence we expect
-            if self.seq != pipe.client_seq[ii].load(Ordering::Relaxed) {
-                continue;
-            }
-
-            // Got the sequence we wanted, get the length
-            let length = pipe.client_len[ii].load(Ordering::Relaxed);
-
-            // Get a slice to the data
-            let data = unsafe {
-                std::slice::from_raw_parts(
-                    UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
-                    length)
-            };
-
-            // Invoke the callback, giving the user access to the data
-            // temporarily before we give it back to the sender
-            func(data)?;
-
-            // Move ownership back to the sender
-            pipe.client_owned[ii].store(false, Ordering::Release);
-
-            // Update sequence we expect
-            self.seq = self.seq.wrapping_add(1);
-            break 'search_buffers;
         }
-
-        // All done!
-        return Ok(());
     }
 }
 

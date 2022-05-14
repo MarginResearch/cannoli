@@ -44,6 +44,27 @@ struct Cannoli32 {
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
 
+    /// Invoked when QEMU is lifting a memory operation. Similar to the
+    /// execution hook, this function is provided with a `buf` and a
+    /// `buf_size` which are to be populated with shellcode to inject into the
+    /// JIT stream. The return value from this function is the number of bytes
+    /// written.
+    ///
+    /// This shellcode is injected prior to writes, and after reads, allowing
+    /// the value that is being read/written to be observed
+    ///
+    /// This function is called with the parameters:
+    ///
+    /// - `is_write` - `0` if this is a read, `1` if this is a write
+    /// - `data_reg` - x86_64 register index to the register which holds the
+    ///                value that was read/written
+    /// - `addr_reg` - x86_64 register index to the register which holds the
+    ///                emulated guest's address that is being accessed
+    /// - `memop`    - One of the QEMU memops from `MemOp` (eg. `MO_8`). This
+    ///                tells us the size of the operation
+    /// - `buf`      - Pointer to QEMU-allocated memory for where to copy
+    ///                shellcode
+    /// - `buf_size` - Size of `buf` in bytes
     size_t (*lift_memop)(int32_t is_write, size_t data_reg, size_t addr_reg,
         int32_t memop, uint8_t *buf, size_t buf_size);
 };
@@ -80,6 +101,27 @@ struct Cannoli64 {
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
     
+    /// Invoked when QEMU is lifting a memory operation. Similar to the
+    /// execution hook, this function is provided with a `buf` and a
+    /// `buf_size` which are to be populated with shellcode to inject into the
+    /// JIT stream. The return value from this function is the number of bytes
+    /// written.
+    ///
+    /// This shellcode is injected prior to writes, and after reads, allowing
+    /// the value that is being read/written to be observed
+    ///
+    /// This function is called with the parameters:
+    ///
+    /// - `is_write` - `0` if this is a read, `1` if this is a write
+    /// - `data_reg` - x86_64 register index to the register which holds the
+    ///                value that was read/written
+    /// - `addr_reg` - x86_64 register index to the register which holds the
+    ///                emulated guest's address that is being accessed
+    /// - `memop`    - One of the QEMU memops from `MemOp` (eg. `MO_8`). This
+    ///                tells us the size of the operation
+    /// - `buf`      - Pointer to QEMU-allocated memory for where to copy
+    ///                shellcode
+    /// - `buf_size` - Size of `buf` in bytes
     size_t (*lift_memop)(int32_t is_write, size_t data_reg, size_t addr_reg,
         int32_t memop, uint8_t *buf, size_t buf_size);
 };
