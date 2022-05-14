@@ -1,7 +1,7 @@
 From 8dc557b5d1dfc1a7a5d46a093b63ca86302bc155 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/2] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 1/3] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -351,7 +351,7 @@ index 0f9cfe96f2..739a4641c3 100644
 From e06c9ec1ac5e404cda639270cb448f9186d9a86b Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/2] Style cleanup, more comments
+Subject: [PATCH 2/3] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -889,6 +889,146 @@ index 739a4641c3..dde9cd89b3 100644
                  }
              }
  #endif
+-- 
+2.35.1
+
+
+From 8a63282dbde3056ae060a01fd177c2860305b04b Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Sat, 14 May 2022 00:27:52 -0700
+Subject: [PATCH 3/3] Added PC support to memops
+
+---
+ tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
+ tcg/tcg.c                 | 12 ++++++++++
+ 2 files changed, 57 insertions(+), 2 deletions(-)
+
+diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
+index 99168526d6..ae8f662c7f 100644
+--- a/tcg/i386/tcg-target.c.inc
++++ b/tcg/i386/tcg-target.c.inc
+@@ -2213,7 +2213,13 @@ static void tcg_out_qemu_ld_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
+ /* XXX: qemu_ld and qemu_st could be modified to clobber only EDX and
+    EAX. It will be useful once fixed registers globals are less
+    common. */
++#ifdef CANNOLI
++/* Add a PC argument so we know what instruction counter is doing the access */
++static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64,
++    target_ulong pc)
++#else
+ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
++#endif /* CANNOLI */
+ {
+     TCGReg datalo, datahi, addrlo;
+     TCGReg addrhi __attribute__((unused));
+@@ -2311,7 +2317,7 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
+          * we saved it there above.
+          */
+         size_t shellcode_size = cannoli->lift_memop(
+-            0, datalo, TCG_REG_R14, opc & MO_SIZE, shellcode,
++            pc, 0, datalo, TCG_REG_R14, opc & MO_SIZE, shellcode,
+             sizeof(shellcode));
+ 
+         /* Make sure the SO library author is not being naughty ;) */
+@@ -2380,7 +2386,13 @@ static void tcg_out_qemu_st_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
+     }
+ }
+ 
++#ifdef CANNOLI
++/* Add a PC argument so we know what instruction counter is doing the access */
++static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64,
++    target_ulong pc)
++#else
+ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
++#endif
+ {
+     TCGReg datalo, datahi, addrlo;
+     TCGReg addrhi __attribute__((unused));
+@@ -2425,7 +2437,7 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
+         }
+ 
+         /* Invoke lifting callback */
+-        size_t shellcode_size = cannoli->lift_memop(
++        size_t shellcode_size = cannoli->lift_memop(pc,
+             1, datalo, addrlo, opc & MO_SIZE, shellcode, sizeof(shellcode));
+ 
+         /* Make sure the SO library author is not being naughty ;) */
+@@ -2487,7 +2499,21 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+     a2 = args[2];
+     const_a2 = const_args[2];
+ 
++#ifdef CANNOLI
++    // Current program counter. Updated by insn_start instructions
++    target_ulong pc = 0;
++#endif // CANNOLI
++
+     switch (opc) {
++#ifdef CANNOLI
++    case INDEX_op_insn_start:
++        // Cannoli enables pushing of `insn_start`s down to this level, so we
++        // actually have to handle it!
++       
++        // Update the current PC tracker
++        pc = *(target_ulong*)const_args;
++        break;
++#endif // CANNOLI
+     case INDEX_op_exit_tb:
+         /* Reuse the zeroing that exists for goto_ptr.  */
+         if (a0 == 0) {
+@@ -2755,6 +2781,22 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+         tcg_out_ext16u(s, a0, a1);
+         break;
+ 
++#ifdef CANNOLI
++    /* Cannoli adds a PC argument to loads and stores */
++    case INDEX_op_qemu_ld_i32:
++        tcg_out_qemu_ld(s, args, 0, pc);
++        break;
++    case INDEX_op_qemu_ld_i64:
++        tcg_out_qemu_ld(s, args, 1, pc);
++        break;
++    case INDEX_op_qemu_st_i32:
++    case INDEX_op_qemu_st8_i32:
++        tcg_out_qemu_st(s, args, 0, pc);
++        break;
++    case INDEX_op_qemu_st_i64:
++        tcg_out_qemu_st(s, args, 1, pc);
++        break;
++#else
+     case INDEX_op_qemu_ld_i32:
+         tcg_out_qemu_ld(s, args, 0);
+         break;
+@@ -2768,6 +2810,7 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+     case INDEX_op_qemu_st_i64:
+         tcg_out_qemu_st(s, args, 1);
+         break;
++#endif /* CANNOLI */
+ 
+     OP_32_64(mulu2):
+         tcg_out_modrm(s, OPC_GRP3_Ev + rexw, EXT3_MUL, args[3]);
+diff --git a/tcg/tcg.c b/tcg/tcg.c
+index dde9cd89b3..590d997d65 100644
+--- a/tcg/tcg.c
++++ b/tcg/tcg.c
+@@ -4384,6 +4384,18 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+                     tcg_out8(s, shellcode[ii]);
+                 }
+             }
++            
++            // In Cannoli, we actually emit the `insn_start` opcode. Normally
++            // QEMU does not do this, however we want to get access to PC
++            // values deeper in the stack, so we push the value further.
++            TCGArg args[TCG_MAX_OP_ARGS] = { 0 };
++            int consts[TCG_MAX_OP_ARGS] = { 0 };
++
++            // Write in the PC into the `consts` array
++            *(target_ulong*)consts = s->gen_insn_data[num_insns][0];
++
++            // Emit the opcode
++            tcg_out_op(s, op->opc, args, consts);
+ #endif
+             break;
+         case INDEX_op_discard:
 -- 
 2.35.1
 
