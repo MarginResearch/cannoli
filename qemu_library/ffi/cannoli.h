@@ -55,6 +55,7 @@ struct Cannoli32 {
     ///
     /// This function is called with the parameters:
     ///
+    /// - `pc`       - Target program counter associated with this operation
     /// - `is_write` - `0` if this is a read, `1` if this is a write
     /// - `data_reg` - x86_64 register index to the register which holds the
     ///                value that was read/written
@@ -65,8 +66,8 @@ struct Cannoli32 {
     /// - `buf`      - Pointer to QEMU-allocated memory for where to copy
     ///                shellcode
     /// - `buf_size` - Size of `buf` in bytes
-    size_t (*lift_memop)(int32_t is_write, size_t data_reg, size_t addr_reg,
-        int32_t memop, uint8_t *buf, size_t buf_size);
+    size_t (*lift_memop)(uint32_t pc, int32_t is_write, size_t data_reg,
+        size_t addr_reg, int32_t memop, uint8_t *buf, size_t buf_size);
 };
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
@@ -112,6 +113,7 @@ struct Cannoli64 {
     ///
     /// This function is called with the parameters:
     ///
+    /// - `pc`       - Target program counter associated with this operation
     /// - `is_write` - `0` if this is a read, `1` if this is a write
     /// - `data_reg` - x86_64 register index to the register which holds the
     ///                value that was read/written
@@ -122,8 +124,8 @@ struct Cannoli64 {
     /// - `buf`      - Pointer to QEMU-allocated memory for where to copy
     ///                shellcode
     /// - `buf_size` - Size of `buf` in bytes
-    size_t (*lift_memop)(int32_t is_write, size_t data_reg, size_t addr_reg,
-        int32_t memop, uint8_t *buf, size_t buf_size);
+    size_t (*lift_memop)(uint64_t pc, int32_t is_write, size_t data_reg,
+        size_t addr_reg, int32_t memop, uint8_t *buf, size_t buf_size);
 };
 
 // If we're building in QEMU these will be defined and we'll make an alias for

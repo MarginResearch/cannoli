@@ -107,71 +107,71 @@ fn parse_payload<T: Cannoli>(user: &T, mut payload: &[u8]) -> Result<()> {
             },
 
             0x11 => { // Read8_32
-                let (addr, val) = consume!(u32, u8);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u8);
+                user.read(pc as u64, addr as u64, val as u64);
             },
             0x12 => { // Read16_32
-                let (addr, val) = consume!(u32, u16);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u16);
+                user.read(pc as u64, addr as u64, val as u64);
             },
             0x14 => { // Read32_32
-                let (addr, val) = consume!(u32, u32);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u32);
+                user.read(pc as u64, addr as u64, val as u64);
             },
             0x18 => { // Read64_32
-                let (addr, val) = consume!(u32, u64);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u64);
+                user.read(pc as u64, addr as u64, val as u64);
             },
 
             0x21 => { // Write8_32
-                let (addr, val) = consume!(u32, u8);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u8);
+                user.write(pc as u64, addr as u64, val as u64);
             },
             0x22 => { // Write16_32
-                let (addr, val) = consume!(u32, u16);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u16);
+                user.write(pc as u64, addr as u64, val as u64);
             },
             0x24 => { // Write32_32
-                let (addr, val) = consume!(u32, u32);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u32);
+                user.write(pc as u64, addr as u64, val as u64);
             },
             0x28 => { // Write64_32
-                let (addr, val) = consume!(u32, u64);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u32, u32, u64);
+                user.write(pc as u64, addr as u64, val as u64);
             },
 
             0x91 => { // Read8_64
-                let (addr, val) = consume!(u64, u8);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u8);
+                user.read(pc as u64, addr as u64, val as u64);
             },
             0x92 => { // Read16_64
-                let (addr, val) = consume!(u64, u16);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u16);
+                user.read(pc as u64, addr as u64, val as u64);
             },
             0x94 => { // Read32_64
-                let (addr, val) = consume!(u64, u32);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u32);
+                user.read(pc as u64, addr as u64, val as u64);
             },
             0x98 => { // Read64_64
-                let (addr, val) = consume!(u64, u64);
-                user.read(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u64);
+                user.read(pc as u64, addr as u64, val as u64);
             },
 
             0xa1 => { // Write8_64
-                let (addr, val) = consume!(u64, u8);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u8);
+                user.write(pc as u64, addr as u64, val as u64);
             },
             0xa2 => { // Write16_64
-                let (addr, val) = consume!(u64, u16);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u16);
+                user.write(pc as u64, addr as u64, val as u64);
             },
             0xa4 => { // Write32_64
-                let (addr, val) = consume!(u64, u32);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u32);
+                user.write(pc as u64, addr as u64, val as u64);
             },
             0xa8 => { // Write64_64
-                let (addr, val) = consume!(u64, u64);
-                user.write(addr as u64, val as u64);
+                let (pc, addr, val) = consume!(u64, u64, u64);
+                user.write(pc as u64, addr as u64, val as u64);
             },
 
             _ => {
@@ -296,11 +296,12 @@ pub trait Cannoli: Send + Sync {
     /// Invoked when a new instruction started execution at `pc`
     fn exec(&self, _pc: u64) {}
 
-    /// Invoked after a read occurred of `addr`, which yielded `val`
-    fn read(&self, _addr: u64, _val: u64) {}
+    /// Invoked after a read occurred of `addr`, which read `val` when
+    /// executing the target instruction at `pc`
+    fn read(&self, _pc: u64, _addr: u64, _val: u64) {}
 
-    /// Invoked before a write of `val` to `addr`
-    fn write(&self, _addr: u64, _val: u64) {}
+    /// Invoked before a write of `val` to `addr` during execution of `pc`
+    fn write(&self, _pc: u64, _addr: u64, _val: u64) {}
 }
 
 struct Moose;
@@ -311,7 +312,7 @@ impl Cannoli for Moose {
         Moose
     }
 
-    fn exec(&self, pc: u64) {
+    fn exec(&self, _pc: u64) {
     }
 }
 
