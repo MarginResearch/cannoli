@@ -402,7 +402,7 @@ pub trait Cannoli: Send + Sync {
     /// are processing traces, the order of the events are not stable. This
     /// function is only meant to reason about `pc` in isolation, not with
     /// respect to previous operations.
-    fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace>;
+    fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace> { None }
 
     /// Invoked when a memory load was lifted from the trace
     ///
@@ -420,7 +420,7 @@ pub trait Cannoli: Send + Sync {
     /// function is only meant to reason about the arguments in isolation,
     /// not with respect to previous operations.
     fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
-        -> Option<Self::Trace>;
+        -> Option<Self::Trace> { None }
 
     /// Invoked when a memory store was lifted from the trace
     ///
@@ -438,7 +438,7 @@ pub trait Cannoli: Send + Sync {
     /// function is only meant to reason about the arguments in isolation,
     /// not with respect to previous operations.
     fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
-        -> Option<Self::Trace>;
+        -> Option<Self::Trace> { None }
 
     /// When a new sequential chunk of traces is available, this is invoked.
     /// This is _always_ invoked sequentially, such that the traces could be
