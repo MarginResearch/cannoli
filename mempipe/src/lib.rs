@@ -358,6 +358,10 @@ impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Drop for
     }
 }
 
+/// A ticket, used to indicate your order in line for a IPC recv polling
+/// operation
+pub struct Ticket(u64);
+
 /// The receiving side of a pipe, this will allow you to read sequenced data
 /// as it was sent from a `SendPipe`
 pub struct RecvPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
@@ -442,49 +446,76 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         })
     }
 
+    /// Requests a ticket. By taking a ticket you are saying that you are ready
+    /// to process data and will be polling `try_recv`.
+    ///
+    /// This determines your order in line for processing data
+    ///
+    /// Dropping a ticket will permanently deadlock the pipe as nobody will
+    /// be around to consume the data.
+    pub fn request_ticket(&self) -> Ticket {
+        // Get a sequence number
+        Ticket(self.seq.fetch_add(1, Ordering::Relaxed))
+    }
+
     /// Attempt to receive data from the pipe, invoking the closure only if
     /// data was ready
-    pub fn try_recv<F, E>(&self, mut func: F) -> std::result::Result<(), E>
-            where F: FnMut(&[u8]) -> std::result::Result<(), E> {
+    ///
+    /// Returns either the old ticket (if it didn't process the buffer), or a
+    /// new ticket if it did
+    ///
+    /// Inside the `Ok()` result, there's a `u64` which is the zero-indexed,
+    /// atomically incrementing sequence number for the buffer that was
+    /// processed. This information allows a parallel user to reorder the
+    /// traces until they are sequenced.
+    pub fn try_recv<F, T, E>(&self, ticket: Ticket, mut func: F)
+                -> (Ticket, Option<std::result::Result<(u64, T), E>>)
+            where F: FnMut(&[u8]) -> std::result::Result<T, E> {
         // Get the pipe
         let pipe = unsafe { &*self.mem_pipe };
 
-        let look = self.seq.fetch_add(1, Ordering::Relaxed);
+        // Look for a filled in buffer
+        for ii in 0..NUM_BUFFERS {
+            // If it's not client owned, skip it
+            if !pipe.client_owned[ii].load(Ordering::Acquire) {
+                continue;
+            }
 
-        loop {
-            // Look for a filled in buffer
-            for ii in 0..NUM_BUFFERS {
-                // If it's not client owned, skip it
-                if !pipe.client_owned[ii].load(Ordering::Acquire) {
-                    continue;
+            // It's client owned, make sure it's the sequence we expect
+            if ticket.0 != pipe.client_seq[ii].load(Ordering::Relaxed) {
+                continue;
+            }
+
+            // Got the sequence we wanted, get the length
+            let length = pipe.client_len[ii].load(Ordering::Relaxed);
+
+            // Get a slice to the data
+            let data = unsafe {
+                std::slice::from_raw_parts(
+                    UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
+                    length)
+            };
+
+            // Invoke the callback, giving the user access to the data
+            // temporarily before we give it back to the sender
+            match func(data) {
+                Ok(resp) => {
+                    // Move ownership back to the sender
+                    pipe.client_owned[ii].store(false, Ordering::Release);
+
+                    // Processed successfully, generate a new ticket
+                    return (self.request_ticket(), Some(Ok((ticket.0, resp))));
                 }
-
-                // It's client owned, make sure it's the sequence we expect
-                if look != pipe.client_seq[ii].load(Ordering::Relaxed) {
-                    continue;
+                Err(err) => {
+                    // Failed to process data, return the ticket back to the
+                    // user
+                    return (ticket, Some(Err(err)));
                 }
-
-                // Got the sequence we wanted, get the length
-                let length = pipe.client_len[ii].load(Ordering::Relaxed);
-
-                // Get a slice to the data
-                let data = unsafe {
-                    std::slice::from_raw_parts(
-                        UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
-                        length)
-                };
-
-                // Invoke the callback, giving the user access to the data
-                // temporarily before we give it back to the sender
-                func(data)?;
-
-                // Move ownership back to the sender
-                pipe.client_owned[ii].store(false, Ordering::Release);
-
-                // Done
-                return Ok(());
             }
         }
+
+        // No buffer was available, give the ticket back
+        (ticket, None)
     }
 }
 
