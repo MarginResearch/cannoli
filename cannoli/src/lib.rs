@@ -264,7 +264,7 @@ fn handle_client<T: Cannoli + 'static>(
                     // Attempt to recv a few times using in-memory IPC. This
                     // is just looped to throttle how often we hit the OS by
                     // doing the socket receive above
-                    for _ in 0..1000 {
+                    for _ in 0..100000 {
                         // Attempt to get a payload from the pipe, parse it if
                         // there was one
                         let (new_ticket, payload) = pipe.try_recv(
@@ -374,7 +374,7 @@ pub fn create_cannoli<T: Cannoli + 'static>(threads: usize) -> Result<()> {
 
 /// Trait which must be implemented by a user to implement their hooks and
 /// analysis of a given QEMU trace
-pub trait Cannoli<'a>: Send + Sync {
+pub trait Cannoli: Send + Sync {
     /// Type to use to convert generic operations into a user-defined
     /// sequential trace buffer
     type Trace: Send;
@@ -447,42 +447,5 @@ pub trait Cannoli<'a>: Send + Sync {
     /// Executed serially. Maybe in different threads, but only one at a time
     /// (hence, mutable access to self)
     fn trace(&mut self, _ctxt: &Self::Context, _trace: &[Self::Trace]) {}
-}
-
-///asdf
-struct Moose;
-
-use std::sync::Arc;
-
-impl<'a> Cannoli<'a> for Moose {
-    type Trace = &'a str;
-
-    type Context = String;
-
-    fn init(_: u64) -> (Self, Self::Context) {
-        println!("New moose!");
-        (Moose, "asdf".into())
-    }
-
-    fn exec(ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace> {
-        Some(ctxt.clone())
-    }
-
-    fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
-            -> Option<Self::Trace> {
-        None
-    }
-
-    fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
-            -> Option<Self::Trace> {
-        None
-    }
-
-    fn trace(&mut self, _ctxt: &Self::Context, trace: &[Self::Trace]) {
-    }
-}
-
-fn main() -> Result<()> {
-    create_cannoli::<Moose>(4)
 }
 

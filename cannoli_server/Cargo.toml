@@ -1,5 +1,5 @@
 [package]
-name = "client_library"
+name = "cannoli_server"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,11 @@ edition = "2021"
 
 [dependencies]
 mempipe = { path = "../mempipe" }
+libc = "*"
+
+[build-dependencies]
+bindgen = "*"
+
+[lib]
+crate-type = ["cdylib"]
 

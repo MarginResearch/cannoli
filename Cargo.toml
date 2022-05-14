@@ -2,7 +2,8 @@
 
 members = [
     "mempipe",
-    "qemu_library",
-    "client_library",
+    "cannoli",
+    "cannoli_server",
+    "example_symbolizer",
 ]
 
