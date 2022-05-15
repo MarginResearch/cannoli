@@ -50,13 +50,13 @@ pub enum Error {
     CString(NulError),
 
     /// Failed to open shared memory file
-    ShmOpen,
+    ShmOpen(std::io::Error),
 
     /// Failed to [`libc::ftruncate`] shared memory when it was created
-    SetMemorySize,
+    SetMemorySize(std::io::Error),
 
     /// Failed to [`libc::mmap`] memory
-    MapMemory,
+    MapMemory(std::io::Error),
 
     /// Attempted to connect to a pipe with a different configuration of
     /// chunk size or number of buffers
@@ -138,6 +138,11 @@ fn filename_from_uid(uid: u64) -> Result<CString> {
     CString::new(format!("cannoli_{:016x}", uid)).map_err(Error::CString)
 }
 
+/// Get the current `errno` and convert it into a [`std::io::Error`]
+fn errno() -> std::io::Error {
+    std::io::Error::from_raw_os_error(errno::errno().0)
+}
+
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         SendPipe<CHUNK_SIZE, NUM_BUFFERS> {
     /// Create a pipe
@@ -163,14 +168,20 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
                 libc::O_CREAT | libc::O_EXCL | libc::O_RDWR,
                 libc::S_IRUSR | libc::S_IWUSR)
         };
-        if shm == -1 { return Err(Error::ShmOpen); }
+        if shm == -1 { return Err(Error::ShmOpen(errno())); }
 
         // Set the shared memory size
         if unsafe { libc::ftruncate(shm,
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>() as i64) }
                     == -1 {
+            // Save error
+            let ret = Error::SetMemorySize(errno());
+
+            // Close the file
             unsafe { libc::close(shm); }
-            return Err(Error::SetMemorySize);
+
+            // Return the error
+            return Err(ret);
         }
 
         // Map the shared memory
@@ -180,13 +191,14 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
                 libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
                 shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
         };
+        let map_err = errno();
 
         // Close the FD as we no longer need it
         unsafe { libc::close(shm); }
 
         // Make sure mapping was successful
         if mapped as usize == libc::MAP_FAILED as usize {
-            return Err(Error::MapMemory);
+            return Err(Error::MapMemory(map_err));
         }
 
         // Initialize the memory
@@ -266,7 +278,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             // Unmap the memory we mapped
             assert!(libc::munmap(self.mem_pipe as *mut _,
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>()) == 0,
-                "Failed to munmap() IPC for SendPipe");
+                "Failed to munmap() IPC for SendPipe : {:?}", errno());
         }
     }
 }
@@ -391,7 +403,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
         // Open shared memory, only if it already exists
         let shm = unsafe { libc::shm_open(cs.as_ptr(), libc::O_RDWR, 0) };
-        if shm == -1 { return Err(Error::ShmOpen); }
+        if shm == -1 { return Err(Error::ShmOpen(errno())); }
 
         // Delete the file, it's SPSC. This isn't atomic or for safety, but
         // this is just the earliest we can delete the file so we don't have
@@ -430,13 +442,14 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
                 libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
                 shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
         };
+        let map_err = errno();
 
         // Close the FD we opened
         unsafe { libc::close(shm); }
 
         // Make sure mapping as successful
         if mapped as usize == libc::MAP_FAILED as usize {
-            return Err(Error::MapMemory);
+            return Err(Error::MapMemory(map_err));
         }
 
         // Return a reference to the memory pipe

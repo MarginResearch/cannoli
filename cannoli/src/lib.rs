@@ -7,6 +7,7 @@ use std::io::Read;
 use std::mem::size_of;
 use std::net::{TcpListener, TcpStream};
 use std::sync::Mutex;
+use std::time::{Instant, Duration};
 use mempipe::RecvPipe;
 
 /// Wrapper around [`Error`]
@@ -257,14 +258,27 @@ fn handle_client<T: Cannoli + 'static>(
                 // Current ticket for getting a trace
                 let mut ticket = Some(pipe.request_ticket());
 
+                // The last time this thread read data
+                let mut last_data = Instant::now();
+
                 // Loop forever while the socket is open. This allows us to
                 // check if the remote process died, our IPC mechanism doesn't
                 // have a way of checking that
                 while !matches!(stream.read(&mut scratch_buffer), Ok(0)) {
-                    // Attempt to recv a few times using in-memory IPC. This
-                    // is just looped to throttle how often we hit the OS by
-                    // doing the socket receive above
-                    for _ in 0..100000 {
+                    // If we haven't gotten any data recent, sleep a bit before
+                    // hot polling. This prevents us completely eating 100% CPU
+                    // when there are threads connected to us but not streaming
+                    // us new data (eg, a client called `sleep()`)
+                    if last_data.elapsed() >= Duration::from_millis(20) {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+
+                    // Poll via shared memory while we keep getting stuff
+                    let mut hot_poll = 10000;
+                    while hot_poll > 0 {
+                        // Update that we did a hot poll
+                        hot_poll -= 1;
+
                         // Attempt to get a payload from the pipe, parse it if
                         // there was one
                         let (new_ticket, payload) = pipe.try_recv(
@@ -279,6 +293,10 @@ fn handle_client<T: Cannoli + 'static>(
                             // It's possible payload parsing failed, so check
                             // the error
                             let (seq, _) = payload?;
+
+                            // Refresh hot polling
+                            hot_poll = 10000;
+                            last_data = Instant::now();
 
                             // Yay, we got a trace!
                             //
@@ -361,9 +379,13 @@ pub fn create_cannoli<T: Cannoli + 'static>(threads: usize) -> Result<()> {
                     .expect("Failed to get uid for IPC");
                 let uid = u64::from_le_bytes(uid);
 
+                println!("New client {:#x}", uid);
+
                 // Handle the client
                 handle_client::<T>(stream, threads, uid)
                     .expect("Failed to handle client");
+
+                println!("Lost client {:#x}", uid);
             });
         }
 

@@ -26,6 +26,11 @@ impl Cannoli for Symbolizer {
 
         // Parse each line into an address and symbol
         for line in data.lines() {
+            // We only care about things in the text section
+            if !line.contains(" t ") && !line.contains(" T ") {
+                continue;
+            }
+
             let chunk = line.splitn(3, ' ').collect::<Vec<_>>();
 
             let addr = u64::from_str_radix(chunk[0], 16).unwrap();
@@ -60,6 +65,7 @@ impl Cannoli for Symbolizer {
         }
     }
 
+    /// Print the trace we processed!
     fn trace(&mut self, _ctxt: &Self::Context, trace: &[Self::Trace]) {
         for (sym, off) in trace {
             println!("{}+{:#x}", sym, off);
@@ -68,6 +74,6 @@ impl Cannoli for Symbolizer {
 }
 
 fn main() {
-    create_cannoli::<Symbolizer>(10).unwrap();
+    create_cannoli::<Symbolizer>(2).unwrap();
 }
 

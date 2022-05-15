@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 libc = "*"
 rand = "*"
+errno = "*"
 
