@@ -1,9 +1,11 @@
 [workspace]
 
+resolver = "2"
 members = [
     "mempipe",
     "cannoli",
     "cannoli_server",
     "example_symbolizer",
+    "example_visualization",
 ]
 
