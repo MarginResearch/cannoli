@@ -1,4 +1,4 @@
 # Logo
 
-![Cannoli Logo](cannoli.png)
+![Cannoli Logo](logo.png)
 
