@@ -25,36 +25,54 @@
 //! for the consumers that are polling metadata, waiting for data to be given
 //! to them.
 
+#![cfg_attr(target_family = "sushi_roll", no_std)]
 #![feature(maybe_uninit_uninit_array, array_from_fn)]
-#![feature(inline_const)]
+#![feature(inline_const, alloc_c_string)]
+
+extern crate alloc;
 
 // This code should work on effectively any UNIX system. It uses `shm_*` APIs
 // and `mmap`, and should be pretty portable between systems with these APIs
-#[cfg(not(target_family = "unix"))]
+#[cfg(not(any(target_family = "unix", target_family = "sushi_roll")))]
 compile_error!("Sorry, currently only UNIX-like systems are supported, you \
     need support for shm_* and mmap APIs");
 
-use std::ptr::addr_of_mut;
-use std::mem::{MaybeUninit, size_of, size_of_val};
-use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicBool, AtomicUsize, AtomicU64, Ordering};
-use std::ffi::{CString, NulError};
+use core::ptr::addr_of_mut;
+use core::mem::{MaybeUninit, size_of};
+use core::cell::UnsafeCell;
+use core::sync::atomic::{AtomicBool, AtomicUsize, AtomicU64, Ordering};
+
+#[cfg(target_family = "sushi_roll")]
+use alloc::alloc::{alloc, Layout};
+
+#[cfg(target_family = "unix")]
+use core::mem::size_of_val;
+
+#[cfg(target_family = "unix")]
+use alloc::format;
+
+#[cfg(target_family = "unix")]
+use alloc::ffi::{CString, NulError};
 
 /// A wrapper around the [`Error`] type
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = core::result::Result<T, Error>;
 
 /// Error types for this module
 #[derive(Debug)]
 pub enum Error {
     /// An error occurred while converting Rust bytes into a [`CString`]
+    #[cfg(target_family = "unix")]
     CString(NulError),
 
+    #[cfg(target_family = "unix")]
     /// Failed to open shared memory file
     ShmOpen(std::io::Error),
 
+    #[cfg(target_family = "unix")]
     /// Failed to [`libc::ftruncate`] shared memory when it was created
     SetMemorySize(std::io::Error),
 
+    #[cfg(target_family = "unix")]
     /// Failed to [`libc::mmap`] memory
     MapMemory(std::io::Error),
 
@@ -82,7 +100,7 @@ const MEMPIPE_MAGIC: u64 = 0x91d021239b73bc57;
 /// This defines the actual shape of a memory pipe in memory, and this is what
 /// is placed in shared memory at offset 0 of the allocated memory
 #[repr(C)]
-struct RawMemPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
+pub struct RawMemPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
     /// Magic header value
     magic: u64,
 
@@ -133,12 +151,14 @@ pub struct SendPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
 }
 
 /// Get the filename for a given `uid`
+#[cfg(target_family = "unix")]
 fn filename_from_uid(uid: u64) -> Result<CString> {
     // Create a [`CString`] of the name to hexlify and null-terminate it
     CString::new(format!("cannoli_{:016x}", uid)).map_err(Error::CString)
 }
 
 /// Get the current `errno` and convert it into a [`std::io::Error`]
+#[cfg(target_family = "unix")]
 fn errno() -> std::io::Error {
     std::io::Error::from_raw_os_error(errno::errno().0)
 }
@@ -152,54 +172,77 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             return Err(Error::InvalidPipeConfiguration);
         }
 
-        // Generate a random name
-        let uid = rand::random::<u64>();
+        #[cfg(target_family = "unix")]
+        let (mapped, uid) = {
+            // Generate a random name
+            let uid = rand::random::<u64>();
 
-        // Get the filename
-        let cs = filename_from_uid(uid)?;
+            // Get the filename
+            let cs = filename_from_uid(uid)?;
 
-        // Delete the shared memory before we create it to make sure we
-        // exclusively create it
-        unsafe { libc::shm_unlink(cs.as_ptr()); }
+            // Delete the shared memory before we create it to make sure we
+            // exclusively create it
+            unsafe { libc::shm_unlink(cs.as_ptr()); }
 
-        // Create new shared memory
-        let shm = unsafe {
-            libc::shm_open(cs.as_ptr(),
-                libc::O_CREAT | libc::O_EXCL | libc::O_RDWR,
-                libc::S_IRUSR | libc::S_IWUSR)
-        };
-        if shm == -1 { return Err(Error::ShmOpen(errno())); }
+            // Create new shared memory
+            let shm = unsafe {
+                libc::shm_open(cs.as_ptr(),
+                    libc::O_CREAT | libc::O_EXCL | libc::O_RDWR,
+                    libc::S_IRUSR | libc::S_IWUSR)
+            };
+            if shm == -1 { return Err(Error::ShmOpen(errno())); }
 
-        // Set the shared memory size
-        if unsafe { libc::ftruncate(shm,
-                size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>() as i64) }
-                    == -1 {
-            // Save error
-            let ret = Error::SetMemorySize(errno());
+            // Set the shared memory size
+            if unsafe { libc::ftruncate(shm,
+                    size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>() as i64) }
+                        == -1 {
+                // Save error
+                let ret = Error::SetMemorySize(errno());
 
-            // Close the file
+                // Close the file
+                unsafe { libc::close(shm); }
+
+                // Return the error
+                return Err(ret);
+            }
+
+            // Map the shared memory
+            let mapped = unsafe {
+                libc::mmap(core::ptr::null_mut(),
+                    size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>(),
+                    libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
+                    shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
+            };
+            let map_err = errno();
+
+            // Close the FD as we no longer need it
             unsafe { libc::close(shm); }
 
-            // Return the error
-            return Err(ret);
-        }
+            // Make sure mapping was successful
+            if mapped as usize == libc::MAP_FAILED as usize {
+                return Err(Error::MapMemory(map_err));
+            }
 
-        // Map the shared memory
-        let mapped = unsafe {
-            libc::mmap(std::ptr::null_mut(),
-                size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>(),
-                libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
-                shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
+            (mapped, uid)
         };
-        let map_err = errno();
+        
+        #[cfg(target_family = "sushi_roll")]
+        let (mapped, uid) = {
+            // Allocate a buffer
+            let buf = unsafe {
+                alloc(Layout::new::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>())
+            };
 
-        // Close the FD as we no longer need it
-        unsafe { libc::close(shm); }
+            // Make sure it's good!
+            assert!(!buf.is_null(), "Failed to allocate memory pipe");
 
-        // Make sure mapping was successful
-        if mapped as usize == libc::MAP_FAILED as usize {
-            return Err(Error::MapMemory(map_err));
-        }
+            // Return a pointer to this memory, and a fixed key. This is just
+            // for benchmarking so we don't need to support more than one key.
+            (
+                buf as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>,
+                0xdeaddeaddeaddead,
+            )
+        };
 
         // Initialize the memory
         unsafe {
@@ -222,6 +265,11 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         }
 
         Ok(Self { mem_pipe: mapped, uid })
+    }
+
+    /// Get the raw backing memory pointer for the pipe
+    pub fn raw(&self) -> *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS> {
+        self.mem_pipe
     }
 
     /// Get the UID for the pipe
@@ -268,6 +316,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Drop for SendPipe<CHUNK_SIZE, NUM_BUFFERS> {
+    #[cfg(target_family = "unix")]
     fn drop(&mut self) {
         unsafe {
             // Delete the file we created
@@ -280,6 +329,11 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>()) == 0,
                 "Failed to munmap() IPC for SendPipe : {:?}", errno());
         }
+    }
+
+    #[cfg(target_family = "sushi_roll")]
+    fn drop(&mut self) {
+        panic!("DROP SP");
     }
 }
 
@@ -392,6 +446,7 @@ unsafe impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Sync for
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {
     /// Open a pipe with the given `uid`
+    #[cfg(target_family = "unix")]
     pub fn open(uid: u64) -> Result<Self> {
         // Make sure settings are sane
         if NUM_BUFFERS == 0 || CHUNK_SIZE == 0 {
@@ -437,7 +492,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
         // Map the shared memory
         let mapped = unsafe {
-            libc::mmap(std::ptr::null_mut(),
+            libc::mmap(core::ptr::null_mut(),
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>(),
                 libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED,
                 shm, 0) as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>
@@ -452,6 +507,17 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             return Err(Error::MapMemory(map_err));
         }
 
+        // Return a reference to the memory pipe
+        Ok(RecvPipe {
+            mem_pipe: mapped,
+            seq:      AtomicU64::new(0),
+        })
+    }
+    
+    /// Open a pipe with a given pointer
+    #[cfg(target_family = "sushi_roll")]
+    pub unsafe fn open(mapped: *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>)
+            -> Result<Self> {
         // Return a reference to the memory pipe
         Ok(RecvPipe {
             mem_pipe: mapped,
@@ -481,10 +547,9 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
     /// atomically incrementing sequence number for the buffer that was
     /// processed. This information allows a parallel user to reorder the
     /// traces until they are sequenced.
-    #[allow(clippy::type_complexity)]
     pub fn try_recv<F, T, E>(&self, ticket: Ticket, mut func: F)
-                -> (Ticket, Option<std::result::Result<(u64, T), E>>)
-            where F: FnMut(&[u8]) -> std::result::Result<T, E> {
+                -> (Ticket, Option<core::result::Result<(u64, T), E>>)
+            where F: FnMut(&[u8]) -> core::result::Result<T, E> {
         // Get the pipe
         let pipe = unsafe { &*self.mem_pipe };
 
@@ -505,7 +570,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
             // Get a slice to the data
             let data = unsafe {
-                std::slice::from_raw_parts(
+                core::slice::from_raw_parts(
                     UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
                     length)
             };
@@ -535,6 +600,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Drop for RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {
+    #[cfg(target_family = "unix")]
     fn drop(&mut self) {
         // Delete our file
         // Unmap the memory we mapped
@@ -543,6 +609,11 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
                 size_of::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>()) == 0,
                 "Failed to munmap() IPC for RecvPipe");
         }
+    }
+    
+    #[cfg(target_family = "sushi_roll")]
+    fn drop(&mut self) {
+        // Nothing to drop on a receive side
     }
 }
 
@@ -569,5 +640,44 @@ fn pipe_config() -> Result<()> {
 fn large_stack_config() -> Result<()> {
     let _pipe = SendPipe::< { 1024 * 1024 * 1024 }, 2>::create()?;
     Ok(())
+}
+
+#[test]
+fn toot() -> Result<()> {
+    use std::time::Instant;
+
+    // We should fail to make a pipe with a mismatched size
+    let mut tx = SendPipe::<1, 4>::create()?;
+    let id = tx.uid();
+
+    let thr = std::thread::spawn(move || -> Result<()> {
+        let rx = RecvPipe::<1, 4>::open(id)?;
+        let mut ticket = rx.request_ticket();
+        let mut foop = 0;
+        while foop < 10000000 {
+            let (new_ticket, res) = rx.try_recv(ticket, |_| -> Result<()> {
+                Ok(())
+            });
+
+            if res.is_some() {
+                foop += 1;
+            }
+
+            ticket = new_ticket;
+        }
+        Ok(())
+    });
+
+    let it = Instant::now();
+    for _ in 0..10000000 {
+        tx.alloc_buffer();
+    }
+
+    let _ = thr.join().unwrap();
+    let elapsed = it.elapsed();
+
+    println!("{:?}", elapsed);
+
+    panic!();
 }
 

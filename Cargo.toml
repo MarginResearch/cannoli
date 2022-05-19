@@ -5,7 +5,7 @@ members = [
     "mempipe",
     "cannoli",
     "cannoli_server",
-    "example_symbolizer",
-    "example_visualization",
+    "examples/symbolizer",
+    "examples/visualization",
 ]
 
