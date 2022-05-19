@@ -3,10 +3,18 @@
 use std::time::Instant;
 use cannoli::{Cannoli, create_cannoli};
 
+/// Get the time stamp counter
+fn rdtsc() -> u64 {
+    unsafe { core::arch::x86_64::_rdtsc() }
+}
+
 /// Benchmark structure
 struct Benchmark {
     /// Start time of the benchmark
     start: Instant,
+
+    /// Start cycles
+    start_cycles: u64,
 
     /// Number of instructions executed
     instructions: u64,
@@ -14,15 +22,19 @@ struct Benchmark {
 
 impl Drop for Benchmark {
     fn drop(&mut self) {
+        // Get cycles elapsed
+        let elapsed_cycles = rdtsc() - self.start_cycles;
+
         // Get time elapsed
         let elapsed = self.start.elapsed().as_secs_f64();
 
         // Get instructions/second
         let ips = self.instructions as f64 / elapsed;
 
-        println!("Executed {:10} instructions in {:8.6} seconds - \
-                {:12.6} Minst/sec",
-            self.instructions, elapsed, ips / 1e6);
+        println!("Executed {:10} instructions in {:8.6} seconds \
+                ({:10} cycles) - {:12.6} Minst/sec - {:8.6} cycles/inst",
+            self.instructions, elapsed, elapsed_cycles, ips / 1e6,
+            elapsed_cycles as f64 / self.instructions as f64);
     }
 }
 
@@ -37,6 +49,7 @@ impl Cannoli for Benchmark {
     fn init(_: u64) -> (Self, Self::Context) {
         (Benchmark {
             start:        Instant::now(),
+            start_cycles: rdtsc(),
             instructions: 0,
         }, ())
     }
