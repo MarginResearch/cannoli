@@ -2,7 +2,7 @@
 
 use cannoli::{Cannoli, create_cannoli};
 
-/// The structure we implement symbolizer for!
+/// The structure we implement [`Cannoli`] for!
 struct Symbolizer;
 
 impl Cannoli for Symbolizer {
