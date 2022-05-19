@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 snuffles = { git = "https://github.com/gamozolabs/snuffles" }
-cannoli = { path = "../cannoli" }
+cannoli = { path = "../../cannoli" }
 
