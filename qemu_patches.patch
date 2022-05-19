@@ -1,7 +1,7 @@
-From 8dc557b5d1dfc1a7a5d46a093b63ca86302bc155 Mon Sep 17 00:00:00 2001
+From 380a28346654924dcce260b21a616a05e4a60f2d Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/4] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 1/5] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -348,10 +348,10 @@ index 0f9cfe96f2..739a4641c3 100644
 2.35.1
 
 
-From e06c9ec1ac5e404cda639270cb448f9186d9a86b Mon Sep 17 00:00:00 2001
+From 1f48bc238cbf5149cf8cc17b0fcc868c395fbeac Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/4] Style cleanup, more comments
+Subject: [PATCH 2/5] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -893,10 +893,10 @@ index 739a4641c3..dde9cd89b3 100644
 2.35.1
 
 
-From 8a63282dbde3056ae060a01fd177c2860305b04b Mon Sep 17 00:00:00 2001
+From c1c0f66463c0d5708babebacc36c508ca379c39a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 3/4] Added PC support to memops
+Subject: [PATCH 3/5] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1033,10 +1033,10 @@ index dde9cd89b3..590d997d65 100644
 2.35.1
 
 
-From 65f0c86a0fbc6d6ef0c969af046b3b37ab765991 Mon Sep 17 00:00:00 2001
+From fb34ac9f9beacdbef56205205006a7d482e8108e Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 4/4] Updated path
+Subject: [PATCH 4/5] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1055,6 +1055,85 @@ index 20dc3c68a1..a71cd470f8 100644
  
  /*
   * Defined in `linux-user/main.c`. Holds global cannoli state and callback
+-- 
+2.35.1
+
+
+From ddf106b975e35ac6958c781e7c8bba63060cafab Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Thu, 19 May 2022 04:37:37 -0700
+Subject: [PATCH 5/5] Added --with-cannoli build flag
+
+---
+ configure         | 9 +++++++++
+ include/tcg/tcg.h | 4 +++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/configure b/configure
+index 0cc8c876f7..edbe353921 100755
+--- a/configure
++++ b/configure
+@@ -299,6 +299,7 @@ plugins="$default_feature"
+ meson=""
+ meson_args=""
+ ninja=""
++cannoli=""
+ bindir="bin"
+ skip_meson=no
+ 
+@@ -858,6 +859,8 @@ for opt do
+   ;;
+   --with-coroutine=*) coroutine="$optarg"
+   ;;
++  --with-cannoli=*) cannoli="$optarg"
++  ;;
+   --disable-zlib-test)
+   ;;
+   --disable-virtio-blk-data-plane|--enable-virtio-blk-data-plane)
+@@ -1044,6 +1047,7 @@ Advanced options (experts only):
+   --disable-werror         disable compilation abort on warning
+   --disable-stack-protector disable compiler-provided stack protection
+   --cpu=CPU                Build for host CPU [$cpu]
++  --with-cannoli=/path/to/cannoli Build with fast Cannoli tracing support
+   --with-coroutine=BACKEND coroutine backend. Supported options:
+                            ucontext, sigaltstack, windows
+   --enable-plugins
+@@ -1999,6 +2003,11 @@ if [ "$bsd" = "yes" ] ; then
+   echo "CONFIG_BSD=y" >> $config_host_mak
+ fi
+ 
++if [ -n "$cannoli" ] ; then
++    echo "CONFIG_CANNOLI=y" >> $config_host_mak
++    QEMU_CFLAGS="-I$cannoli $QEMU_CFLAGS"
++fi
++
+ echo "CONFIG_COROUTINE_BACKEND=$coroutine" >> $config_host_mak
+ 
+ if test "$have_asan_iface_fiber" = "yes" ; then
+diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
+index a71cd470f8..657dfefc92 100644
+--- a/include/tcg/tcg.h
++++ b/include/tcg/tcg.h
+@@ -41,9 +41,10 @@
+  * context switches, page table changes, etc.
+  */
+ #ifdef CONFIG_LINUX_USER
++#ifdef CONFIG_CANNOLI
+ #define CANNOLI
+ #ifdef CANNOLI
+-#include "/home/pleb/cannoli/cannoli_server/ffi/cannoli.h"
++#include "cannoli_server/ffi/cannoli.h"
+ 
+ /*
+  * Defined in `linux-user/main.c`. Holds global cannoli state and callback
+@@ -51,6 +52,7 @@
+  */
+ extern Cannoli *cannoli;
+ #endif /* CANNOLI */
++#endif /* CONFIG_CANNOLI */
+ #endif /* CONFIG_LINUX_USER */
+ 
+ /* XXX: make safe guess about sizes */
 -- 
 2.35.1
 
