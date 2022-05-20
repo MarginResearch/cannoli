@@ -1,4 +1,4 @@
-![Cannoli Mascot!](/margin_assets/logo.png)
+![Cannoli Mascot!](/logo.png)
 
 ## Cannoli
 
