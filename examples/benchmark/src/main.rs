@@ -66,6 +66,6 @@ impl Cannoli for Benchmark {
 }
 
 fn main() {
-    create_cannoli::<Benchmark>(2).unwrap();
+    create_cannoli::<Benchmark>(4).unwrap();
 }
 
