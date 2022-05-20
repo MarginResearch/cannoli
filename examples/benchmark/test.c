@@ -8,3 +8,8 @@ __start(void) {
     *(volatile char*)1 = 1;
 }
 
+void
+_start(void) {
+    __start();
+}
+

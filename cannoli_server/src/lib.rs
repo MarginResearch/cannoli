@@ -18,7 +18,7 @@ fn hook_inst(_pc: u64) -> bool {
 }
 
 /// Called when a memory access is being lifted in QEMU. Returning `true` will
-/// cause the memory access to events in the trace buffer.
+/// cause the memory access to generate events in the trace buffer.
 ///
 /// This may be called from multiple threads
 fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool {
