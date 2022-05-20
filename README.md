@@ -60,6 +60,7 @@ cargo run --release
 In another terminal, run the program in QEMU with Cannoli!
 
 ```
+cd examples/symbolizer
 /path/to/qemu/build/qemu-mipsel -cannoli /path/to/cannoli/target/release/libcannoli_server.so ./example_app
 ```
 
