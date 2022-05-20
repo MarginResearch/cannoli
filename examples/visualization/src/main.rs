@@ -107,7 +107,7 @@ enum GraphType {
 }
 
 /// A very bad graphing API
-struct ShitGraph {
+struct Graph {
     x: u32,
     y: u32,
 
@@ -119,7 +119,7 @@ struct ShitGraph {
     data: Vec<(Instant, u64)>,
 }
 
-impl ShitGraph {
+impl Graph {
     fn new(x: u32, y: u32, width: u32, height: u32, graph_type: GraphType)
             -> Self {
         Self {
@@ -210,16 +210,16 @@ impl ShitGraph {
 
 /// Our structure for rendering and stuff
 struct Renderer {
-    graphs: Vec<ShitGraph>,
+    graphs: Vec<Graph>,
 }
 
 impl EventHandler for Renderer {
     fn create(_window: &mut Window<Self>) -> Self {
         Self {
             graphs: vec![
-                ShitGraph::new(  0, 0, 200, 200, GraphType::Instr),
-                ShitGraph::new(200, 0, 200, 200, GraphType::Load),
-                ShitGraph::new(400, 0, 200, 200, GraphType::Store),
+                Graph::new(  0, 0, 200, 200, GraphType::Instr),
+                Graph::new(200, 0, 200, 200, GraphType::Load),
+                Graph::new(400, 0, 200, 200, GraphType::Store),
             ],
         }
     }

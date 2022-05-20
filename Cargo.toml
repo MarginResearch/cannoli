@@ -8,5 +8,6 @@ members = [
     "examples/visualization",
     "examples/symbolizer",
     "examples/benchmark",
+    "examples/benchmark_graph",
 ]
 
