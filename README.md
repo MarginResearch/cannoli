@@ -38,17 +38,7 @@ git clone https://github.com/qemu/QEMU
 Apply patch from `qemu_patches.patch`
 
 ```
-pleb@gamey ~/mooseie $ git am ~/cannoli/qemu_patches.patch
-Applying: Synced with 742848ad987b27fdbeab11323271ca7d196152fb
-Applying: Style cleanup, more comments
-Applying: Added PC support to memops
-.git/rebase-apply/patch:70: trailing whitespace.
-       
-.git/rebase-apply/patch:117: trailing whitespace.
-            
-warning: 2 lines add whitespace errors.
-Applying: Updated path
-Applying: Added --with-cannoli build flag
+git am ~/cannoli/qemu_patches.patch
 ```
 
 Build QEMU for your desired targets (example mipsel and riscv64)
