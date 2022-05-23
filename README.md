@@ -22,6 +22,7 @@ the data from a single QEMU thread to parallelize processing of traces.
 ## Is it fast?
 
 ![Graph showing 2.2 billion instructions/sec](/perf_graph.png)
+
 <sub>perf with a single QEMU thread running the benchmark example on a
 Intel Xeon Silver 4310 @ 2.1 GHz</sub>
 
