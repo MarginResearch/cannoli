@@ -19,6 +19,10 @@ Cannoli can handle billions of target instructions per second, can handle
 multi-threaded qemu-user applications, and allows multiple threads to consume
 the data from a single QEMU thread to parallelize processing of traces.
 
+## Is it fast?
+
+![Graph showing 2.2 billion instructions/sec](/perf_graph.png)
+
 ## TL;DR Getting it running
 
 Build Cannoli
