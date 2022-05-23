@@ -23,8 +23,9 @@ the data from a single QEMU thread to parallelize processing of traces.
 
 ![Graph showing 2.2 billion instructions/sec](/perf_graph.png)
 
-<sub>perf with a single QEMU thread running the benchmark example on a
-Intel Xeon Silver 4310 @ 2.1 GHz</sub>
+<sub>Performance with a single QEMU thread running the benchmark example on a
+Intel Xeon Silver 4310 @ 2.1 GHz, target is mipsel-linux, hot loop of
+unrolled nops to benchmark PC tracing bandwidth (worst case for us)</sub>
 
 ## TL;DR Getting it running
 
