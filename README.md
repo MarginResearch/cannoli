@@ -38,7 +38,8 @@ git clone https://github.com/qemu/QEMU
 Apply patch from `qemu_patches.patch`
 
 ```
-git am ~/cannoli/qemu_patches.patch
+cd QEMU
+git am </path/to/cannoli>/qemu_patches.patch
 ```
 
 Build QEMU for your desired targets (example mipsel and riscv64)
@@ -46,7 +47,8 @@ Build QEMU for your desired targets (example mipsel and riscv64)
 ```
 mkdir build
 cd build
-../configure --target-list=mipsel-linux-user,riscv64-linux-user --with-cannoli=/path/to/cannoli
+../configure --target-list=mipsel-linux-user,riscv64-linux-user --extra-ldflags="-ldl" --with-cannoli=</path/to/cannoli>
+make
 ```
 Try out the example symbolizer
 
@@ -61,7 +63,7 @@ In another terminal, run the program in QEMU with Cannoli!
 
 ```
 cd examples/symbolizer
-/path/to/qemu/build/qemu-mipsel -cannoli /path/to/cannoli/target/release/libcannoli_server.so ./example_app
+</path/to/qemu>/build/qemu-mipsel -cannoli </path/to/cannoli>/target/release/libcannoli_server.so ./example_app
 ```
 
 ## What to do
