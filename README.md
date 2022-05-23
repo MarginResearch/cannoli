@@ -123,7 +123,7 @@ fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool {
 
 These hooks provide an opportunity for a user to decide whether or not a given
 instruction or memory access should be hooked. Returning `true` (the default)
-results in instrumenting the instruction. Returning `false`, means that no
+results in instrumenting the instruction. Returning `false` means that no
 instrumentation is added to the JIT, and thus, QEMU runs with full speed
 emulation.
 
@@ -143,7 +143,7 @@ provides a filtering mechanism for an end-user.
 
 ### Cannoli "client"
 
-Cannoli then has a client component. The clients goal is to process the massive
+Cannoli then has a client component. The client's goal is to process the massive
 stream of data being produced by QEMU. Further, the API for Cannoli has been
 designed with threading in mind, such that a single thread can be running
 inside qemu-user, and complex analysis of that stream can be done by threading
