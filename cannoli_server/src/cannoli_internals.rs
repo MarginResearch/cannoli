@@ -352,6 +352,9 @@ unsafe extern fn $memop(pc: $tusize, is_write: i32, data_reg: usize,
     // Create access to buffer
     let tmp = std::slice::from_raw_parts_mut(buf as *mut u8, shellcode.len());
 
+    // Patch the PC placeholder with the actual PC
+    patch(tmp, (REPLACE_WITH_PC as $tusize).to_le_bytes(), pc.to_le_bytes());
+
     // So, we can't use an address in our shellcode since we don't know that
     // information at compile time. Thus, we replace the `REPLACE_WITH_FLUSH`
     // with the run-time address where that has been loaded
@@ -572,11 +575,12 @@ cannoli_memhook_\access\()_\data\()_\addr\():
     // Address and data
 .if \width == 4
     mov dword ptr [r12 + (\width * 0 + 1)], {REPLACE_WITH_PC}
-.elseif \width == 8
+.endif
+    mov [r12 + \width * 1 + 1], \addr
+.if \width == 8
     mov r14, {REPLACE_WITH_PC}
     mov [r12 + \width * 0 + 1], r14
 .endif
-    mov [r12 + \width * 1 + 1], \addr
     mov [r12 + \width * 2 + 1], \data
 
     // Advance buffer
