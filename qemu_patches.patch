@@ -1,7 +1,7 @@
 From 739f8261e82ab26133e099bb45f4cb748b21d238 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/6] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 1/7] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -351,7 +351,7 @@ index 0f9cfe96f2..739a4641c3 100644
 From 4ea5de83d22a8e1ed5c88ceebef0ee46062d1829 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/6] Style cleanup, more comments
+Subject: [PATCH 2/7] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -896,7 +896,7 @@ index 739a4641c3..dde9cd89b3 100644
 From 035ece90db148340bbfde386ad1d357cc2456215 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 3/6] Added PC support to memops
+Subject: [PATCH 3/7] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1036,7 +1036,7 @@ index dde9cd89b3..590d997d65 100644
 From cefa4afe5d42f89d7413ecad52a7a23f3f412d10 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 4/6] Updated path
+Subject: [PATCH 4/7] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1062,7 +1062,7 @@ index 20dc3c68a1..a71cd470f8 100644
 From de5634ebb87af14d73f19370b646a95fc20e5b16 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 5/6] Added --with-cannoli build flag
+Subject: [PATCH 5/7] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1141,7 +1141,7 @@ index a71cd470f8..657dfefc92 100644
 From 46a30e0c8bbc9a059dd540dfee3d921c17b742a0 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
-Subject: [PATCH 6/6] Fixed cannoli PC for memory operations
+Subject: [PATCH 6/7] Fixed cannoli PC for memory operations
 
 ---
  tcg/i386/tcg-target.c.inc | 21 ++++++-----------
@@ -1303,6 +1303,35 @@ index 590d997d65..d9d035576a 100644
                 some common argument patterns */
 -            tcg_reg_alloc_op(s, op);
 +            tcg_reg_alloc_op(s, op, cannoli_pc);
+             break;
+         }
+ #ifdef CONFIG_DEBUG_TCG
+-- 
+2.35.1
+
+
+From 0126fa2e853ea10d6ef3c397e3a7153d4d1c80e4 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Mon, 30 May 2022 00:30:14 -0700
+Subject: [PATCH 7/7] Wrap code in cannoli as needed
+
+---
+ tcg/tcg.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/tcg/tcg.c b/tcg/tcg.c
+index d9d035576a..8c508de957 100644
+--- a/tcg/tcg.c
++++ b/tcg/tcg.c
+@@ -4432,7 +4432,11 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+             /* Note: in order to speed up the code, it would be much
+                faster to have specialized register allocator functions for
+                some common argument patterns */
++#ifdef CANNOLI
+             tcg_reg_alloc_op(s, op, cannoli_pc);
++#else
++            tcg_reg_alloc_op(s, op);
++#endif
              break;
          }
  #ifdef CONFIG_DEBUG_TCG
