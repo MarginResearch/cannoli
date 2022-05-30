@@ -168,9 +168,9 @@ You then optionally can implement the following callbacks:
 
 ```rust
 fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace>;
-fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
+fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64, _sz: u8)
     -> Option<Self::Trace>; 
-fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64);
+fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64, _sz: u8);
     -> Option<Self::Trace>; 
 fn trace(&mut self, _ctxt: &Self::Context, _trace: &[Self::Trace])
 ```
