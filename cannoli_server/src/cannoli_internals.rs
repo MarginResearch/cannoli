@@ -209,6 +209,12 @@ unsafe extern fn $entry(out_regs: *mut usize) {
         // Get mutable access to the hook state
         let mut hook = hook.borrow_mut();
 
+        // Make sure we didn't do a double entry. This is to catch places where
+        // we might exit the JIT without calling JIT exit, indicating where we
+        // need more QEMU hooks
+        assert!(hook.active_buffer.is_none(),
+            "Cannoli: Whoa, got JIT entry without a JIT exit!");
+
         // Allocate a new buffer in our pipe
         let mut buffer = hook.pipe.alloc_buffer();
 
@@ -244,6 +250,16 @@ unsafe extern fn $exit(r12: usize, _r13: usize, _r14: usize) {
     HOOK_STATE.with(|hook| {
         // Get mutable access to the hook state
         let mut hook = hook.borrow_mut();
+
+        // QEMU is duct-taped together with longjmps and these can happen
+        // inside the JIT. We're trying to carefully hook everything that can
+        // possibly exit the JIT, and sometimes we get it wrong :(
+        // Blame QEMU for making this impossible to do :(
+        assert!(r12 as u64 != CANNOLI_POISON,
+            "Cannoli: Oh no! Cannoli hit a poisoned JIT exit. This means that \
+             something in QEMU exited the JIT that we do not hook. This means \
+             that the trace is no longer valid as it may not have been \
+             flushed");
 
         // Get the active buffer and replace it with `None`
         let ab = hook.active_buffer.take()

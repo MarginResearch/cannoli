@@ -10,7 +10,10 @@ typedef __UINT64_TYPE__ uint64_t;
 typedef __SIZE_TYPE__   size_t;
 
 /// Random 64-bit integer defining this Cannoli version
-static const uint64_t CANNOLI_VERSION = 0x1da10aa01ee092c0ULL;
+static const uint64_t CANNOLI_VERSION = 0xd0a4509ffe852f3ULL;
+
+/// Poison value to indicate that the trace buffer is not actively set
+static const uint64_t CANNOLI_POISON = 0x5ac91c0a3c7b863eULL;
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
 /// how to invoke us
@@ -101,7 +104,7 @@ struct Cannoli64 {
     /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
-    
+
     /// Invoked when QEMU is lifting a memory operation. Similar to the
     /// execution hook, this function is provided with a `buf` and a
     /// `buf_size` which are to be populated with shellcode to inject into the

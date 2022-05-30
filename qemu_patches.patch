@@ -1,7 +1,7 @@
-From 739f8261e82ab26133e099bb45f4cb748b21d238 Mon Sep 17 00:00:00 2001
+From 61928f76276683059342cd077ef02749e7524776 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/7] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 1/8] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -32,7 +32,7 @@ index 26a70526f1..063c4c18d1 100644
  #define MAX_OP_PER_INSTR 266
  
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 651e32f5f2..c2aa9d6790 100644
+index 7ca48664e4..481f33e121 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
 @@ -54,6 +54,10 @@
@@ -348,10 +348,10 @@ index 0f9cfe96f2..739a4641c3 100644
 2.35.1
 
 
-From 4ea5de83d22a8e1ed5c88ceebef0ee46062d1829 Mon Sep 17 00:00:00 2001
+From b23f51273e9411d7a0d7808ec88ded311e05cfc7 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/7] Style cleanup, more comments
+Subject: [PATCH 2/8] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -392,7 +392,7 @@ index 063c4c18d1..20dc3c68a1 100644
  /* XXX: make safe guess about sizes */
  #define MAX_OP_PER_INSTR 266
 diff --git a/linux-user/main.c b/linux-user/main.c
-index c2aa9d6790..0320881fea 100644
+index 481f33e121..86238c2441 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
 @@ -55,8 +55,11 @@
@@ -893,10 +893,10 @@ index 739a4641c3..dde9cd89b3 100644
 2.35.1
 
 
-From 035ece90db148340bbfde386ad1d357cc2456215 Mon Sep 17 00:00:00 2001
+From 0efc4ab316ebffdd7a67fe833afcc4458693e760 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 3/7] Added PC support to memops
+Subject: [PATCH 3/8] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1033,10 +1033,10 @@ index dde9cd89b3..590d997d65 100644
 2.35.1
 
 
-From cefa4afe5d42f89d7413ecad52a7a23f3f412d10 Mon Sep 17 00:00:00 2001
+From b3267a15063ece5a3b4f0b950ab4e32b1fba7513 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 4/7] Updated path
+Subject: [PATCH 4/8] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1059,10 +1059,10 @@ index 20dc3c68a1..a71cd470f8 100644
 2.35.1
 
 
-From de5634ebb87af14d73f19370b646a95fc20e5b16 Mon Sep 17 00:00:00 2001
+From a48c630bdc849511c49866056fbea2aec6e3d061 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 5/7] Added --with-cannoli build flag
+Subject: [PATCH 5/8] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1070,7 +1070,7 @@ Subject: [PATCH 5/7] Added --with-cannoli build flag
  2 files changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/configure b/configure
-index 180ee688dc..836560d565 100755
+index 103a7b02e8..024a5e39d0 100755
 --- a/configure
 +++ b/configure
 @@ -299,6 +299,7 @@ plugins="$default_feature"
@@ -1081,7 +1081,7 @@ index 180ee688dc..836560d565 100755
  bindir="bin"
  skip_meson=no
  
-@@ -856,6 +857,8 @@ for opt do
+@@ -858,6 +859,8 @@ for opt do
    ;;
    --with-coroutine=*) coroutine="$optarg"
    ;;
@@ -1090,7 +1090,7 @@ index 180ee688dc..836560d565 100755
    --disable-zlib-test)
    ;;
    --disable-virtio-blk-data-plane|--enable-virtio-blk-data-plane)
-@@ -1034,6 +1037,7 @@ Advanced options (experts only):
+@@ -1044,6 +1047,7 @@ Advanced options (experts only):
    --disable-werror         disable compilation abort on warning
    --disable-stack-protector disable compiler-provided stack protection
    --cpu=CPU                Build for host CPU [$cpu]
@@ -1098,7 +1098,7 @@ index 180ee688dc..836560d565 100755
    --with-coroutine=BACKEND coroutine backend. Supported options:
                             ucontext, sigaltstack, windows
    --enable-plugins
-@@ -1981,6 +1985,11 @@ if [ "$bsd" = "yes" ] ; then
+@@ -2001,6 +2005,11 @@ if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
  fi
  
@@ -1138,10 +1138,10 @@ index a71cd470f8..657dfefc92 100644
 2.35.1
 
 
-From 46a30e0c8bbc9a059dd540dfee3d921c17b742a0 Mon Sep 17 00:00:00 2001
+From 022d77fc60a9596c05c2cea6ed8a252b772b125a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
-Subject: [PATCH 6/7] Fixed cannoli PC for memory operations
+Subject: [PATCH 6/8] Fixed cannoli PC for memory operations
 
 ---
  tcg/i386/tcg-target.c.inc | 21 ++++++-----------
@@ -1310,10 +1310,10 @@ index 590d997d65..d9d035576a 100644
 2.35.1
 
 
-From 0126fa2e853ea10d6ef3c397e3a7153d4d1c80e4 Mon Sep 17 00:00:00 2001
+From 314324d41e3082f9352993b9d1183f8c16c2c72c Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
-Subject: [PATCH 7/7] Wrap code in cannoli as needed
+Subject: [PATCH 7/8] Wrap code in cannoli as needed
 
 ---
  tcg/tcg.c | 4 ++++
@@ -1335,6 +1335,560 @@ index d9d035576a..8c508de957 100644
              break;
          }
  #ifdef CONFIG_DEBUG_TCG
+-- 
+2.35.1
+
+
+From ad9c7ffa61da0d4a25f045acd126731228341bf4 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Mon, 30 May 2022 06:05:07 -0700
+Subject: [PATCH 8/8] Fixed cannoli not flushing on longjmps and signals
+
+---
+ accel/tcg/cpu-exec-common.c | 16 ++++++++++++++++
+ accel/tcg/cpu-exec.c        |  5 +++++
+ linux-user/signal.c         | 26 ++++++++++++++++++++++++++
+ target/alpha/cpu.h          |  7 +++++++
+ target/arm/cpu.h            |  7 +++++++
+ target/avr/cpu.h            |  7 +++++++
+ target/cris/cpu.h           |  7 +++++++
+ target/hexagon/cpu.h        |  7 +++++++
+ target/hppa/cpu.h           |  7 +++++++
+ target/i386/cpu.h           |  7 +++++++
+ target/m68k/cpu.h           |  7 +++++++
+ target/microblaze/cpu.h     |  7 +++++++
+ target/mips/cpu.h           |  7 +++++++
+ target/nios2/cpu.h          |  7 +++++++
+ target/openrisc/cpu.h       |  7 +++++++
+ target/ppc/cpu.h            |  7 +++++++
+ target/riscv/cpu.h          |  7 +++++++
+ target/rx/cpu.h             |  7 +++++++
+ target/s390x/cpu.h          |  6 ++++++
+ target/sh4/cpu.h            |  7 +++++++
+ target/sparc/cpu.h          |  7 +++++++
+ target/tricore/cpu.h        |  7 +++++++
+ target/xtensa/cpu.h         |  7 +++++++
+ tcg/tcg.c                   | 26 ++++++++++++++++++++++++++
+ 24 files changed, 212 insertions(+)
+
+diff --git a/accel/tcg/cpu-exec-common.c b/accel/tcg/cpu-exec-common.c
+index be6fe45aa5..e74228fb5b 100644
+--- a/accel/tcg/cpu-exec-common.c
++++ b/accel/tcg/cpu-exec-common.c
+@@ -22,6 +22,12 @@
+ #include "sysemu/tcg.h"
+ #include "exec/exec-all.h"
+ 
++#ifdef CONFIG_LINUX_USER
++#ifdef CONFIG_CANNOLI
++#include "tcg/tcg.h"
++#endif /* CONFIG_CANNOLI */
++#endif /* CONFIG_LINUX_USER */
++
+ bool tcg_allowed;
+ 
+ /* exit the current TB, but without causing any exception to be raised */
+@@ -63,6 +69,16 @@ void cpu_reloading_memory_map(void)
+ 
+ void cpu_loop_exit(CPUState *cpu)
+ {
++#ifdef CANNOLI
++    /* If we ever exit the CPU loop, perform a JIT exit */
++    if(cannoli && cannoli->jit_exit) {
++        CPUArchState *env = cpu->env_ptr;
++
++        cannoli->jit_exit(
++                env->cannoli_r12, env->cannoli_r13, env->cannoli_r14);
++    }
++#endif
++
+     /* Undo the setting in cpu_tb_exec.  */
+     cpu->can_do_io = 1;
+     siglongjmp(cpu->jmp_env, 1);
+diff --git a/accel/tcg/cpu-exec.c b/accel/tcg/cpu-exec.c
+index 635aeecc0a..affc38ce5b 100644
+--- a/accel/tcg/cpu-exec.c
++++ b/accel/tcg/cpu-exec.c
+@@ -352,6 +352,11 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
+     TranslationBlock *last_tb;
+     const void *tb_ptr = itb->tc.ptr;
+ 
++#ifdef CANNOLI
++    /* Poison the cannoli state before entering the JIT */
++    env->cannoli_r12 = CANNOLI_POISON;
++#endif
++
+     log_cpu_exec(itb->pc, cpu, itb);
+ 
+     qemu_thread_jit_execute();
+diff --git a/linux-user/signal.c b/linux-user/signal.c
+index 8d29bfaa6b..09ad99e384 100644
+--- a/linux-user/signal.c
++++ b/linux-user/signal.c
+@@ -33,6 +33,12 @@
+ #include "host-signal.h"
+ #include "user/safe-syscall.h"
+ 
++#ifdef CONFIG_LINUX_USER
++#ifdef CONFIG_CANNOLI
++#include "tcg/tcg.h"
++#endif /* CONFIG_CANNOLI */
++#endif /* CONFIG_LINUX_USER */
++
+ static struct target_sigaction sigact_table[TARGET_NSIG];
+ 
+ static void host_signal_handler(int host_signum, siginfo_t *info,
+@@ -823,6 +829,13 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+     bool sync_sig = false;
+     void *sigmask = host_signal_mask(uc);
+ 
++#ifdef CANNOLI
++    /* Save the register state in the cannoli C state */
++    env->cannoli_r12 = uc->uc_mcontext.gregs[REG_R12];
++    env->cannoli_r13 = uc->uc_mcontext.gregs[REG_R13];
++    env->cannoli_r14 = uc->uc_mcontext.gregs[REG_R14];
++#endif
++
+     /*
+      * Non-spoofed SIGSEGV and SIGBUS are synchronous, and need special
+      * handling wrt signal blocking and unwinding.
+@@ -852,6 +865,10 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+                 /* If this was a write to a TB protected page, restart. */
+                 if (is_write &&
+                     handle_sigsegv_accerr_write(cpu, sigmask, pc, guest_addr)) {
++#ifdef CANNOLI
++                    /* Re-poison cannoli */
++                    env->cannoli_r12 = CANNOLI_POISON;
++#endif
+                     return;
+                 }
+ 
+@@ -881,6 +898,10 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+     /* get target signal number */
+     guest_sig = host_to_target_signal(host_sig);
+     if (guest_sig < 1 || guest_sig > TARGET_NSIG) {
++#ifdef CANNOLI
++        /* Re-poison cannoli */
++        env->cannoli_r12 = CANNOLI_POISON;
++#endif
+         return;
+     }
+     trace_user_host_signal(env, host_sig, guest_sig);
+@@ -922,6 +943,11 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+ 
+     /* interrupt the virtual CPU as soon as possible */
+     cpu_exit(thread_cpu);
++
++#ifdef CANNOLI
++    /* Re-poison cannoli */
++    env->cannoli_r12 = CANNOLI_POISON;
++#endif
+ }
+ 
+ /* do_sigaltstack() returns target values and errnos. */
+diff --git a/target/alpha/cpu.h b/target/alpha/cpu.h
+index d0abc949a8..f54fb0f15f 100644
+--- a/target/alpha/cpu.h
++++ b/target/alpha/cpu.h
+@@ -250,6 +250,13 @@ typedef struct CPUArchState {
+     uint32_t features;
+     uint32_t amask;
+     int implver;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUAlphaState;
+ 
+ /**
+diff --git a/target/arm/cpu.h b/target/arm/cpu.h
+index 18ca61e8e2..a919ffdc48 100644
+--- a/target/arm/cpu.h
++++ b/target/arm/cpu.h
+@@ -746,6 +746,13 @@ typedef struct CPUArchState {
+     /* Linux syscall tagged address support */
+     bool tagged_addr_enable;
+ #endif
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUARMState;
+ 
+ static inline void set_feature(CPUARMState *env, int feature)
+diff --git a/target/avr/cpu.h b/target/avr/cpu.h
+index d304f33301..53a0034682 100644
+--- a/target/avr/cpu.h
++++ b/target/avr/cpu.h
+@@ -135,6 +135,13 @@ typedef struct CPUArchState {
+     bool fullacc; /* CPU/MEM if true MEM only otherwise */
+ 
+     uint64_t features;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUAVRState;
+ 
+ /**
+diff --git a/target/cris/cpu.h b/target/cris/cpu.h
+index e6776f25b1..d3dbd56701 100644
+--- a/target/cris/cpu.h
++++ b/target/cris/cpu.h
+@@ -165,6 +165,13 @@ typedef struct CPUArchState {
+ 
+         /* Members from load_info on are preserved across resets.  */
+         void *load_info;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUCRISState;
+ 
+ /**
+diff --git a/target/hexagon/cpu.h b/target/hexagon/cpu.h
+index 2a65a57bab..b20f9ebcc6 100644
+--- a/target/hexagon/cpu.h
++++ b/target/hexagon/cpu.h
+@@ -128,6 +128,13 @@ typedef struct CPUArchState {
+     target_ulong vstore_pending[VSTORES_MAX];
+     bool vtcm_pending;
+     VTCMStoreLog vtcm_log;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUHexagonState;
+ 
+ OBJECT_DECLARE_CPU_TYPE(HexagonCPU, HexagonCPUClass, HEXAGON_CPU)
+diff --git a/target/hppa/cpu.h b/target/hppa/cpu.h
+index 6f3b6beecf..3d8a6e599c 100644
+--- a/target/hppa/cpu.h
++++ b/target/hppa/cpu.h
+@@ -206,6 +206,13 @@ typedef struct CPUArchState {
+     /* ??? We should use a more intelligent data structure.  */
+     hppa_tlb_entry tlb[HPPA_TLB_ENTRIES];
+     uint32_t tlb_last;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUHPPAState;
+ 
+ /**
+diff --git a/target/i386/cpu.h b/target/i386/cpu.h
+index 0d528ac58f..a2ce2aaebf 100644
+--- a/target/i386/cpu.h
++++ b/target/i386/cpu.h
+@@ -1771,6 +1771,13 @@ typedef struct CPUArchState {
+     TPRAccess tpr_access_type;
+ 
+     unsigned nr_dies;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUX86State;
+ 
+ struct kvm_msrs;
+diff --git a/target/m68k/cpu.h b/target/m68k/cpu.h
+index 9b3bf7a448..855acdb2af 100644
+--- a/target/m68k/cpu.h
++++ b/target/m68k/cpu.h
+@@ -149,6 +149,13 @@ typedef struct CPUArchState {
+ 
+     /* Fields from here on are preserved across CPU reset. */
+     uint32_t features;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUM68KState;
+ 
+ /*
+diff --git a/target/microblaze/cpu.h b/target/microblaze/cpu.h
+index 1e84dd8f47..ea21031cb2 100644
+--- a/target/microblaze/cpu.h
++++ b/target/microblaze/cpu.h
+@@ -291,6 +291,13 @@ struct CPUArchState {
+     struct {} end_reset_fields;
+ 
+     /* These fields are preserved on reset.  */
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ /*
+diff --git a/target/mips/cpu.h b/target/mips/cpu.h
+index 5335ac10a3..433112d479 100644
+--- a/target/mips/cpu.h
++++ b/target/mips/cpu.h
+@@ -1160,6 +1160,13 @@ typedef struct CPUArchState {
+     QEMUTimer *timer; /* Internal timer */
+     target_ulong exception_base; /* ExceptionBase input to the core */
+     uint64_t cp0_count_ns; /* CP0_Count clock period (in nanoseconds) */
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUMIPSState;
+ 
+ /**
+diff --git a/target/nios2/cpu.h b/target/nios2/cpu.h
+index f85581ee56..a60954cc16 100644
+--- a/target/nios2/cpu.h
++++ b/target/nios2/cpu.h
+@@ -200,6 +200,13 @@ struct CPUArchState {
+     Nios2MMU mmu;
+ #endif
+     int error_code;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ typedef struct {
+diff --git a/target/openrisc/cpu.h b/target/openrisc/cpu.h
+index b9584f10d4..355084f27f 100644
+--- a/target/openrisc/cpu.h
++++ b/target/openrisc/cpu.h
+@@ -290,6 +290,13 @@ typedef struct CPUArchState {
+     uint32_t picmr;         /* Interrupt mask register */
+     uint32_t picsr;         /* Interrupt contrl register*/
+ #endif
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUOpenRISCState;
+ 
+ /**
+diff --git a/target/ppc/cpu.h b/target/ppc/cpu.h
+index 48596cfb25..73b752b732 100644
+--- a/target/ppc/cpu.h
++++ b/target/ppc/cpu.h
+@@ -1233,6 +1233,13 @@ struct CPUArchState {
+      * running cycles.
+      */
+     uint64_t pmu_base_time;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ #define SET_FIT_PERIOD(a_, b_, c_, d_)          \
+diff --git a/target/riscv/cpu.h b/target/riscv/cpu.h
+index fe6c9a2c92..bed470c3aa 100644
+--- a/target/riscv/cpu.h
++++ b/target/riscv/cpu.h
+@@ -341,6 +341,13 @@ struct CPUArchState {
+     uint64_t kvm_timer_compare;
+     uint64_t kvm_timer_state;
+     uint64_t kvm_timer_frequency;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ OBJECT_DECLARE_CPU_TYPE(RISCVCPU, RISCVCPUClass, RISCV_CPU)
+diff --git a/target/rx/cpu.h b/target/rx/cpu.h
+index 5655dffeff..372bf94bc5 100644
+--- a/target/rx/cpu.h
++++ b/target/rx/cpu.h
+@@ -98,6 +98,13 @@ typedef struct CPUArchState {
+     uint32_t ack_ipl;           /* execute ipl */
+     float_status fp_status;
+     qemu_irq ack;               /* Interrupt acknowledge */
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPURXState;
+ 
+ /*
+diff --git a/target/s390x/cpu.h b/target/s390x/cpu.h
+index 7d6d01325b..512c69bd03 100644
+--- a/target/s390x/cpu.h
++++ b/target/s390x/cpu.h
+@@ -151,6 +151,12 @@ struct CPUArchState {
+     /* currently processed sigp order */
+     uint8_t sigp_order;
+ 
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ static inline uint64_t *get_freg(CPUS390XState *cs, int nr)
+diff --git a/target/sh4/cpu.h b/target/sh4/cpu.h
+index 9f15ef913c..17a6d7fd01 100644
+--- a/target/sh4/cpu.h
++++ b/target/sh4/cpu.h
+@@ -188,6 +188,13 @@ typedef struct CPUArchState {
+     int in_sleep;		/* SR_BL ignored during sleep */
+     memory_content *movcal_backup;
+     memory_content **movcal_backup_tail;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUSH4State;
+ 
+ /**
+diff --git a/target/sparc/cpu.h b/target/sparc/cpu.h
+index f80ea2e8cf..380c740282 100644
+--- a/target/sparc/cpu.h
++++ b/target/sparc/cpu.h
+@@ -549,6 +549,13 @@ struct CPUArchState {
+ 
+     /* Leon3 cache control */
+     uint32_t cache_control;
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ /**
+diff --git a/target/tricore/cpu.h b/target/tricore/cpu.h
+index 3b9c533a7c..28035d9763 100644
+--- a/target/tricore/cpu.h
++++ b/target/tricore/cpu.h
+@@ -189,6 +189,13 @@ typedef struct CPUArchState {
+     const tricore_def_t *cpu_model;
+     void *irq[8];
+     struct QEMUTimer *timer; /* Internal timer */
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPUTriCoreState;
+ 
+ /**
+diff --git a/target/xtensa/cpu.h b/target/xtensa/cpu.h
+index 579adcb769..da4af8d732 100644
+--- a/target/xtensa/cpu.h
++++ b/target/xtensa/cpu.h
+@@ -547,6 +547,13 @@ struct CPUArchState {
+ 
+     /* Watchpoints for DBREAK registers */
+     struct CPUWatchpoint *cpu_watchpoint[MAX_NDBREAK];
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ };
+ 
+ /**
+diff --git a/tcg/tcg.c b/tcg/tcg.c
+index 8c508de957..6d2de178e9 100644
+--- a/tcg/tcg.c
++++ b/tcg/tcg.c
+@@ -4063,6 +4063,20 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
+         save_globals(s, allocated_regs);
+     }
+ 
++#ifdef CANNOLI
++    /* Save current cannoli registers to an accessible-by-C location as we may
++     * be calling something that longjmp()s from inside QEMU's JIT to outside
++     * and will need to flush the buffers. Thus, from C functions we have to
++     * have access to the current buffer state.
++     */
++    tcg_out_st(s, TCG_TYPE_PTR, TCG_REG_R12, TCG_AREG0,
++            offsetof(CPUArchState, cannoli_r12));
++    tcg_out_st(s, TCG_TYPE_PTR, TCG_REG_R13, TCG_AREG0,
++            offsetof(CPUArchState, cannoli_r13));
++    tcg_out_st(s, TCG_TYPE_PTR, TCG_REG_R14, TCG_AREG0,
++            offsetof(CPUArchState, cannoli_r14));
++#endif
++
+ #ifdef CONFIG_TCG_INTERPRETER
+     {
+         gpointer hash = (gpointer)(uintptr_t)info->typemask;
+@@ -4074,6 +4088,18 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
+     tcg_out_call(s, func_addr);
+ #endif
+ 
++#ifdef CANNOLI
++    /* Poison the current C-side cannoli register state as we're about to
++     * track them in registers.
++     *
++     * We re-poison here as we're about to go back into the JIT as the call
++     * above returned back to us instead of longjmp()ing.
++     */
++    tcg_out_movi(s, TCG_TYPE_PTR, TCG_REG_RDI, CANNOLI_POISON);
++    tcg_out_st(s, TCG_TYPE_PTR, TCG_REG_RDI, TCG_AREG0,
++            offsetof(CPUArchState, cannoli_r12));
++#endif
++
+     /* assign output registers and emit moves if needed */
+     for(i = 0; i < nb_oargs; i++) {
+         arg = op->args[i];
 -- 
 2.35.1
 
