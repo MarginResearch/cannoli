@@ -27,6 +27,13 @@ the data from a single QEMU thread to parallelize processing of traces.
 Intel Xeon Silver 4310 @ 2.1 GHz, target is mipsel-linux, hot loop of
 unrolled nops to benchmark PC tracing bandwidth (worst case for us)</sub>
 
+## Example symbolizer
+
+For an example, check out the symbolizer! Here's the kind of information you
+can get!
+
+![Example symbolizer showing memory accesses and PC executions](/example_symbol.png)
+
 ## TL;DR Getting it running
 
 Build Cannoli
