@@ -113,71 +113,71 @@ fn parse_payload<T: Cannoli>(user: &T::Context, trace: &mut Vec<T::Trace>,
             },
 
             0x11 => { // Read8_32
-                let (pc, addr, val) = consume!(u32, u32, u8);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u8, u32);
+                T::read(user, pc as u64, addr as u64, val as u64, 1)
             },
             0x12 => { // Read16_32
-                let (pc, addr, val) = consume!(u32, u32, u16);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u16, u32);
+                T::read(user, pc as u64, addr as u64, val as u64, 2)
             },
             0x14 => { // Read32_32
-                let (pc, addr, val) = consume!(u32, u32, u32);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u32, u32);
+                T::read(user, pc as u64, addr as u64, val as u64, 4)
             },
             0x18 => { // Read64_32
-                let (pc, addr, val) = consume!(u32, u32, u64);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u64, u32);
+                T::read(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             0x21 => { // Write8_32
-                let (pc, addr, val) = consume!(u32, u32, u8);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u8, u32);
+                T::write(user, pc as u64, addr as u64, val as u64, 1)
             },
             0x22 => { // Write16_32
-                let (pc, addr, val) = consume!(u32, u32, u16);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u16, u32);
+                T::write(user, pc as u64, addr as u64, val as u64, 2)
             },
             0x24 => { // Write32_32
-                let (pc, addr, val) = consume!(u32, u32, u32);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u32, u32);
+                T::write(user, pc as u64, addr as u64, val as u64, 4)
             },
             0x28 => { // Write64_32
-                let (pc, addr, val) = consume!(u32, u32, u64);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u32, u64, u32);
+                T::write(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             0x91 => { // Read8_64
-                let (pc, addr, val) = consume!(u64, u64, u8);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u8, u64);
+                T::read(user, pc as u64, addr as u64, val as u64, 1)
             },
             0x92 => { // Read16_64
-                let (pc, addr, val) = consume!(u64, u64, u16);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u16, u64);
+                T::read(user, pc as u64, addr as u64, val as u64, 2)
             },
             0x94 => { // Read32_64
-                let (pc, addr, val) = consume!(u64, u64, u32);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u32, u64);
+                T::read(user, pc as u64, addr as u64, val as u64, 4)
             },
             0x98 => { // Read64_64
-                let (pc, addr, val) = consume!(u64, u64, u64);
-                T::read(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u64, u64);
+                T::read(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             0xa1 => { // Write8_64
-                let (pc, addr, val) = consume!(u64, u64, u8);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u8, u64);
+                T::write(user, pc as u64, addr as u64, val as u64, 1)
             },
             0xa2 => { // Write16_64
-                let (pc, addr, val) = consume!(u64, u64, u16);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u16, u64);
+                T::write(user, pc as u64, addr as u64, val as u64, 2)
             },
             0xa4 => { // Write32_64
-                let (pc, addr, val) = consume!(u64, u64, u32);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u32, u64);
+                T::write(user, pc as u64, addr as u64, val as u64, 4)
             },
             0xa8 => { // Write64_64
-                let (pc, addr, val) = consume!(u64, u64, u64);
-                T::write(user, pc as u64, addr as u64, val as u64)
+                let (addr, val, pc) = consume!(u64, u64, u64);
+                T::write(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             _ => {
@@ -426,7 +426,8 @@ pub trait Cannoli: Send + Sync {
     /// respect to previous operations.
     fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace> { None }
 
-    /// Invoked when a memory load was lifted from the trace
+    /// Invoked when a memory load was lifted from the trace with a given
+    /// access size in bytes
     ///
     /// Executed on multiple threads
     ///
@@ -441,10 +442,11 @@ pub trait Cannoli: Send + Sync {
     /// are processing traces, the order of the events are not stable. This
     /// function is only meant to reason about the arguments in isolation,
     /// not with respect to previous operations.
-    fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
+    fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64, _sz: u8)
         -> Option<Self::Trace> { None }
 
-    /// Invoked when a memory store was lifted from the trace
+    /// Invoked when a memory store was lifted from the trace with a given
+    /// access size in bytes
     ///
     /// Executed on multiple threads
     ///
@@ -459,7 +461,7 @@ pub trait Cannoli: Send + Sync {
     /// are processing traces, the order of the events are not stable. This
     /// function is only meant to reason about the arguments in isolation,
     /// not with respect to previous operations.
-    fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64)
+    fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64, _sz: u8)
         -> Option<Self::Trace> { None }
 
     /// When a new sequential chunk of traces is available, this is invoked.

@@ -10,4 +10,7 @@ members = [
     "examples/benchmark",
     "examples/benchmark_graph",
 ]
+default-members = [
+    "cannoli_server",
+]
 

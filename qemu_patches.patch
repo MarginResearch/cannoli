@@ -1,7 +1,7 @@
-From 380a28346654924dcce260b21a616a05e4a60f2d Mon Sep 17 00:00:00 2001
+From 739f8261e82ab26133e099bb45f4cb748b21d238 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/5] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 1/6] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -32,7 +32,7 @@ index 26a70526f1..063c4c18d1 100644
  #define MAX_OP_PER_INSTR 266
  
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 7ca48664e4..481f33e121 100644
+index 651e32f5f2..c2aa9d6790 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
 @@ -54,6 +54,10 @@
@@ -348,10 +348,10 @@ index 0f9cfe96f2..739a4641c3 100644
 2.35.1
 
 
-From 1f48bc238cbf5149cf8cc17b0fcc868c395fbeac Mon Sep 17 00:00:00 2001
+From 4ea5de83d22a8e1ed5c88ceebef0ee46062d1829 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/5] Style cleanup, more comments
+Subject: [PATCH 2/6] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -392,7 +392,7 @@ index 063c4c18d1..20dc3c68a1 100644
  /* XXX: make safe guess about sizes */
  #define MAX_OP_PER_INSTR 266
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 481f33e121..86238c2441 100644
+index c2aa9d6790..0320881fea 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
 @@ -55,8 +55,11 @@
@@ -893,10 +893,10 @@ index 739a4641c3..dde9cd89b3 100644
 2.35.1
 
 
-From c1c0f66463c0d5708babebacc36c508ca379c39a Mon Sep 17 00:00:00 2001
+From 035ece90db148340bbfde386ad1d357cc2456215 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 3/5] Added PC support to memops
+Subject: [PATCH 3/6] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1033,10 +1033,10 @@ index dde9cd89b3..590d997d65 100644
 2.35.1
 
 
-From fb34ac9f9beacdbef56205205006a7d482e8108e Mon Sep 17 00:00:00 2001
+From cefa4afe5d42f89d7413ecad52a7a23f3f412d10 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 4/5] Updated path
+Subject: [PATCH 4/6] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1059,10 +1059,10 @@ index 20dc3c68a1..a71cd470f8 100644
 2.35.1
 
 
-From ddf106b975e35ac6958c781e7c8bba63060cafab Mon Sep 17 00:00:00 2001
+From de5634ebb87af14d73f19370b646a95fc20e5b16 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 5/5] Added --with-cannoli build flag
+Subject: [PATCH 5/6] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1070,7 +1070,7 @@ Subject: [PATCH 5/5] Added --with-cannoli build flag
  2 files changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/configure b/configure
-index 0cc8c876f7..edbe353921 100755
+index 180ee688dc..836560d565 100755
 --- a/configure
 +++ b/configure
 @@ -299,6 +299,7 @@ plugins="$default_feature"
@@ -1081,7 +1081,7 @@ index 0cc8c876f7..edbe353921 100755
  bindir="bin"
  skip_meson=no
  
-@@ -858,6 +859,8 @@ for opt do
+@@ -856,6 +857,8 @@ for opt do
    ;;
    --with-coroutine=*) coroutine="$optarg"
    ;;
@@ -1090,7 +1090,7 @@ index 0cc8c876f7..edbe353921 100755
    --disable-zlib-test)
    ;;
    --disable-virtio-blk-data-plane|--enable-virtio-blk-data-plane)
-@@ -1044,6 +1047,7 @@ Advanced options (experts only):
+@@ -1034,6 +1037,7 @@ Advanced options (experts only):
    --disable-werror         disable compilation abort on warning
    --disable-stack-protector disable compiler-provided stack protection
    --cpu=CPU                Build for host CPU [$cpu]
@@ -1098,7 +1098,7 @@ index 0cc8c876f7..edbe353921 100755
    --with-coroutine=BACKEND coroutine backend. Supported options:
                             ucontext, sigaltstack, windows
    --enable-plugins
-@@ -1999,6 +2003,11 @@ if [ "$bsd" = "yes" ] ; then
+@@ -1981,6 +1985,11 @@ if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
  fi
  
@@ -1134,6 +1134,178 @@ index a71cd470f8..657dfefc92 100644
  #endif /* CONFIG_LINUX_USER */
  
  /* XXX: make safe guess about sizes */
+-- 
+2.35.1
+
+
+From 46a30e0c8bbc9a059dd540dfee3d921c17b742a0 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Sun, 29 May 2022 20:56:50 -0700
+Subject: [PATCH 6/6] Fixed cannoli PC for memory operations
+
+---
+ tcg/i386/tcg-target.c.inc | 21 ++++++-----------
+ tcg/tcg.c                 | 47 +++++++++++++++++++++++++--------------
+ 2 files changed, 37 insertions(+), 31 deletions(-)
+
+diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
+index ae8f662c7f..874e43be29 100644
+--- a/tcg/i386/tcg-target.c.inc
++++ b/tcg/i386/tcg-target.c.inc
+@@ -2476,9 +2476,16 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
+ #endif
+ }
+ 
++#ifdef CANNOLI
++static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
++                              const TCGArg args[TCG_MAX_OP_ARGS],
++                              const int const_args[TCG_MAX_OP_ARGS],
++                              const target_ulong pc)
++#else
+ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+                               const TCGArg args[TCG_MAX_OP_ARGS],
+                               const int const_args[TCG_MAX_OP_ARGS])
++#endif
+ {
+     TCGArg a0, a1, a2;
+     int c, const_a2, vexop, rexw = 0;
+@@ -2499,21 +2506,7 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+     a2 = args[2];
+     const_a2 = const_args[2];
+ 
+-#ifdef CANNOLI
+-    // Current program counter. Updated by insn_start instructions
+-    target_ulong pc = 0;
+-#endif // CANNOLI
+-
+     switch (opc) {
+-#ifdef CANNOLI
+-    case INDEX_op_insn_start:
+-        // Cannoli enables pushing of `insn_start`s down to this level, so we
+-        // actually have to handle it!
+-       
+-        // Update the current PC tracker
+-        pc = *(target_ulong*)const_args;
+-        break;
+-#endif // CANNOLI
+     case INDEX_op_exit_tb:
+         /* Reuse the zeroing that exists for goto_ptr.  */
+         if (a0 == 0) {
+diff --git a/tcg/tcg.c b/tcg/tcg.c
+index 590d997d65..d9d035576a 100644
+--- a/tcg/tcg.c
++++ b/tcg/tcg.c
+@@ -107,9 +107,16 @@ static void tcg_out_ld(TCGContext *s, TCGType type, TCGReg ret, TCGReg arg1,
+ static bool tcg_out_mov(TCGContext *s, TCGType type, TCGReg ret, TCGReg arg);
+ static void tcg_out_movi(TCGContext *s, TCGType type,
+                          TCGReg ret, tcg_target_long arg);
++#ifdef CANNOLI
++static void tcg_out_op(TCGContext *s, TCGOpcode opc,
++                       const TCGArg args[TCG_MAX_OP_ARGS],
++                       const int const_args[TCG_MAX_OP_ARGS],
++                       const target_ulong pc);
++#else
+ static void tcg_out_op(TCGContext *s, TCGOpcode opc,
+                        const TCGArg args[TCG_MAX_OP_ARGS],
+                        const int const_args[TCG_MAX_OP_ARGS]);
++#endif
+ #if TCG_TARGET_MAYBE_vec
+ static bool tcg_out_dup_vec(TCGContext *s, TCGType type, unsigned vece,
+                             TCGReg dst, TCGReg src);
+@@ -3650,7 +3657,15 @@ static void tcg_reg_alloc_dup(TCGContext *s, const TCGOp *op)
+     }
+ }
+ 
++/* Cannoli passes the PC of the opcode to the IL op */
++#ifdef CANNOLI
++static void tcg_reg_alloc_op(
++        TCGContext *s,
++        const TCGOp *op,
++        const target_ulong pc)
++#else
+ static void tcg_reg_alloc_op(TCGContext *s, const TCGOp *op)
++#endif
+ {
+     const TCGLifeData arg_life = op->life;
+     const TCGOpDef * const def = &tcg_op_defs[op->opc];
+@@ -3817,7 +3832,12 @@ static void tcg_reg_alloc_op(TCGContext *s, const TCGOp *op)
+         tcg_out_vec_op(s, op->opc, TCGOP_VECL(op), TCGOP_VECE(op),
+                        new_args, const_args);
+     } else {
++#ifdef CANNOLI
++        /* Cannoli passes the PC */
++        tcg_out_op(s, op->opc, new_args, const_args, pc);
++#else
+         tcg_out_op(s, op->opc, new_args, const_args);
++#endif
+     }
+ 
+     /* move the outputs in the correct register if needed */
+@@ -4316,6 +4336,11 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+     s->pool_labels = NULL;
+ #endif
+ 
++#ifdef CANNOLI
++    // Current target program counter. Updated by insn_start instructions
++    target_ulong cannoli_pc = (target_ulong)0xdeaddeaddeaddeadULL;
++#endif // CANNOLI
++
+     num_insns = -1;
+     QTAILQ_FOREACH(op, &s->ops, link) {
+         TCGOpcode opc = op->opc;
+@@ -4352,6 +4377,9 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+             }
+ 
+ #ifdef CANNOLI
++            /* Record the PC of the target instruction */
++            cannoli_pc = s->gen_insn_data[num_insns][0];
++
+             /*
+              * First `insn_start` variable is the PC of the instruction.
+              * It may be encoded as 2 32-bit ints when emulating a
+@@ -4364,13 +4392,10 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+                 /* Should be large enough for any reasonable shellcode */
+                 uint8_t shellcode[1024];
+ 
+-                /* Get the PC */
+-                target_ulong pc = s->gen_insn_data[num_insns][0];
+-
+                 /* Invoke lifting callback */
+                 size_t shellcode_size =
+                     cannoli->lift_instruction(
+-                        pc, shellcode, sizeof(shellcode));
++                        cannoli_pc, shellcode, sizeof(shellcode));
+ 
+                 /* Make sure the SO library author is not being naughty ;) */
+                 if(shellcode_size > sizeof(shellcode)) {
+@@ -4384,18 +4409,6 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+                     tcg_out8(s, shellcode[ii]);
+                 }
+             }
+-            
+-            // In Cannoli, we actually emit the `insn_start` opcode. Normally
+-            // QEMU does not do this, however we want to get access to PC
+-            // values deeper in the stack, so we push the value further.
+-            TCGArg args[TCG_MAX_OP_ARGS] = { 0 };
+-            int consts[TCG_MAX_OP_ARGS] = { 0 };
+-
+-            // Write in the PC into the `consts` array
+-            *(target_ulong*)consts = s->gen_insn_data[num_insns][0];
+-
+-            // Emit the opcode
+-            tcg_out_op(s, op->opc, args, consts);
+ #endif
+             break;
+         case INDEX_op_discard:
+@@ -4419,7 +4432,7 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+             /* Note: in order to speed up the code, it would be much
+                faster to have specialized register allocator functions for
+                some common argument patterns */
+-            tcg_reg_alloc_op(s, op);
++            tcg_reg_alloc_op(s, op, cannoli_pc);
+             break;
+         }
+ #ifdef CONFIG_DEBUG_TCG
 -- 
 2.35.1
 

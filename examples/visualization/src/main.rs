@@ -62,12 +62,12 @@ impl Cannoli for Tracer {
         Some(Trace::Instr(pc as u32))
     }
 
-    fn read(_ctxt: &Self::Context, _pc: u64, addr: u64, _val: u64)
+    fn read(_ctxt: &Self::Context, _pc: u64, addr: u64, _val: u64, _sz: u8)
             -> Option<Self::Trace> {
         Some(Trace::Load(addr as u32))
     }
 
-    fn write(_ctxt: &Self::Context, _pc: u64, addr: u64, _val: u64)
+    fn write(_ctxt: &Self::Context, _pc: u64, addr: u64, _val: u64, _sz: u8)
             -> Option<Self::Trace> {
         Some(Trace::Store(addr as u32))
     }

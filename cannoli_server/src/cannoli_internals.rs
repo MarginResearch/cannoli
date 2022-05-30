@@ -73,7 +73,7 @@ thread_local! {
 }
 
 /// Patch a buffer by searching for `magic` and replacing it with `new`
-/// 
+///
 /// Only patches the first instance of `magic`, panics if no instances of
 /// `magic` were found
 fn patch(buf: &mut [u8], magic: impl AsRef<[u8]>, new: impl AsRef<[u8]>) {
@@ -301,7 +301,7 @@ unsafe extern fn $memop(pc: $tusize, is_write: i32, data_reg: usize,
     // Make sure the register values make sense
     assert!(data_reg < 16, "Cannoli: Invalid data_reg input to memop");
     assert!(addr_reg < 16, "Cannoli: Invalid addr_reg input to memop");
-    
+
     // Do nothing if the hook doesn't want to hook this operation
     let memsize = [1, 2, 4, 8];
     if !crate::hook_mem(pc as u64, is_write != 0, memsize[memop as usize]) {
@@ -351,6 +351,9 @@ unsafe extern fn $memop(pc: $tusize, is_write: i32, data_reg: usize,
 
     // Create access to buffer
     let tmp = std::slice::from_raw_parts_mut(buf as *mut u8, shellcode.len());
+
+    // Patch the PC placeholder with the actual PC
+    patch(tmp, (REPLACE_WITH_PC as $tusize).to_le_bytes(), pc.to_le_bytes());
 
     // So, we can't use an address in our shellcode since we don't know that
     // information at compile time. Thus, we replace the `REPLACE_WITH_FLUSH`
@@ -570,14 +573,16 @@ cannoli_memhook_\access\()_\data\()_\addr\():
 .endif
 
     // Address and data
+    mov [r12          + 1], \addr
+    mov [r12 + \width + 1], \data
+
+    // Store the PC
 .if \width == 4
-    mov dword ptr [r12 + (\width * 0 + 1)], {REPLACE_WITH_PC}
+    mov dword ptr [r12 + \width + 1 + \datawidth], {REPLACE_WITH_PC}
 .elseif \width == 8
     mov r14, {REPLACE_WITH_PC}
-    mov [r12 + \width * 0 + 1], r14
+    mov [r12 + \width + 1 + \datawidth], r14
 .endif
-    mov [r12 + \width * 1 + 1], \addr
-    mov [r12 + \width * 2 + 1], \data
 
     // Advance buffer
     add r12, \width * 2 + \datawidth + 1
@@ -637,13 +642,13 @@ cannoli_memhook_\access\()_\data\()_\addr\()_end:
 multiple_create_memhook32 1, al, cl, dl, bl, spl, bpl, sil, dil, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b
 multiple_create_memhook32 2, ax, cx, dx, bx, sp, bp, si, di, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w
 multiple_create_memhook32 4, eax, ecx, edx, ebx, esp, ebp, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
-multiple_create_memhook32 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 
+multiple_create_memhook32 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
 
 // Create all possible memhooks for 64-bit
 multiple_create_memhook64 1, al, cl, dl, bl, spl, bpl, sil, dil, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b
 multiple_create_memhook64 2, ax, cx, dx, bx, sp, bp, si, di, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w
 multiple_create_memhook64 4, eax, ecx, edx, ebx, esp, ebp, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
-multiple_create_memhook64 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 
+multiple_create_memhook64 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
 
 "#,
     // Some magic values we use in our assembly for find-and-replace

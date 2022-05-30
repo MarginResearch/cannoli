@@ -2,18 +2,86 @@
 
 use cannoli::{Cannoli, create_cannoli};
 
+/// An original pointer address, and then a resolved symbol + offset for that
+/// address
+struct SymOff {
+    /// The "raw", original address
+    addr: u64,
+
+    /// Symbol
+    symbol: &'static str,
+
+    /// Offset from the base of the symbol
+    offset: u64,
+}
+
+impl std::fmt::Display for SymOff {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:#018x} ({}+{:#x})", self.addr, self.symbol, self.offset)
+    }
+}
+
+enum Operation {
+    Exec  { pc: SymOff },
+    Read  { pc: SymOff, addr: SymOff, val: u64, sz: u8 },
+    Write { pc: SymOff, addr: SymOff, val: u64, sz: u8 },
+}
+
 /// The structure we implement [`Cannoli`] for!
 struct Symbolizer;
 
+/// Context shared between threads
+struct Context {
+    /// Lookup from an address to a symbol, stored in sorted order
+    symbols: Vec<(u64, &'static str)>,
+}
+
+impl Context {
+    /// Attempt to resolve a symbol into a symbol and an offset
+    fn resolve(&self, addr: u64) -> SymOff {
+        // Get access to the symbols
+        let symbols = &self.symbols;
+
+        // Find the symbol
+        match symbols.binary_search_by_key(&addr, |x| x.0) {
+            Ok(pos) => {
+                // Direct symbol match
+                SymOff {
+                    addr,
+                    symbol: symbols[pos].1,
+                    offset: 0
+                }
+            }
+            Err(pos) => {
+                // Found location after symbol, find the nearest symbol below
+                if let Some((sa, sym)) = pos.checked_sub(1)
+                        .and_then(|x| symbols.get(x)) {
+                    // Got symbol below
+                    SymOff {
+                        addr,
+                        symbol: sym,
+                        offset: addr - sa
+                    }
+                } else {
+                    // No symbols below this address, just emit the PC
+                    SymOff {
+                        addr,
+                        symbol: "<unknown>",
+                        offset: addr,
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl Cannoli for Symbolizer {
     /// The type emit in the serialized trace
-    ///
-    /// In our case, this is `(symbol, offset)`
-    type Trace = (&'static str, u64);
+    type Trace = Operation;
 
     /// Context, the shared, immutable context shared between all threads doing
     /// processing. We stuff our symbol table here.
-    type Context = Vec<(u64, &'static str)>;
+    type Context = Context;
 
     /// Load the symbol table
     fn init(_: u64) -> (Self, Self::Context) {
@@ -26,11 +94,6 @@ impl Cannoli for Symbolizer {
 
         // Parse each line into an address and symbol
         for line in data.lines() {
-            // We only care about things in the text section
-            if !line.contains(" t ") && !line.contains(" T ") {
-                continue;
-            }
-
             let chunk = line.splitn(3, ' ').collect::<Vec<_>>();
 
             let addr = u64::from_str_radix(chunk[0], 16).unwrap();
@@ -41,34 +104,48 @@ impl Cannoli for Symbolizer {
         // Sort the symbols by address
         symbols.sort_by_key(|x| x.0);
 
-        (Self, symbols)
+        (Self, Context { symbols })
     }
 
     /// Convert PCs into symbol + offset in parallel
     fn exec(ctxt: &Self::Context, pc: u64) -> Option<Self::Trace> {
-        // Find the symbol
-        match ctxt.binary_search_by_key(&pc, |x| x.0) {
-            Ok(pos) => {
-                // Direct symbol match
-                Some((ctxt[pos].1, 0))
-            }
-            Err(pos) => {
-                // Found location after symbol, find the nearest symbol below
-                if let Some((addr, sym)) = ctxt.get(pos.wrapping_sub(1)) {
-                    // Got symbol below
-                    Some((sym, pc - addr))
-                } else {
-                    // No symbols below this address, just emit the PC
-                    Some(("<unknown>", pc))
-                }
-            }
-        }
+        Some(Operation::Exec { pc: ctxt.resolve(pc) })
+    }
+
+    /// Symbolize reads
+    fn read(ctxt: &Self::Context, pc: u64, addr: u64, val: u64, sz: u8)
+            -> Option<Self::Trace> {
+        Some(Operation::Read {
+            pc:   ctxt.resolve(pc),
+            addr: ctxt.resolve(addr),
+            val, sz,
+        })
+    }
+
+    /// Symbolize writes
+    fn write(ctxt: &Self::Context, pc: u64, addr: u64, val: u64, sz: u8)
+            -> Option<Self::Trace> {
+        Some(Operation::Write {
+            pc:   ctxt.resolve(pc),
+            addr: ctxt.resolve(addr),
+            val, sz,
+        })
     }
 
     /// Print the trace we processed!
     fn trace(&mut self, _ctxt: &Self::Context, trace: &[Self::Trace]) {
-        for (sym, off) in trace {
-            println!("{}+{:#x}", sym, off);
+        for op in trace {
+            match op {
+                Operation::Exec { pc } => {
+                    println!("EXEC   @ {pc}");
+                }
+                Operation::Read { pc, addr, val, sz } => {
+                    println!("READ{sz}  @ {pc} | {addr} ={val:#x}");
+                }
+                Operation::Write { pc, addr, val, sz } => {
+                    println!("WRITE{sz} @ {pc} | {addr} ={val:#x}");
+                }
+            }
         }
     }
 }

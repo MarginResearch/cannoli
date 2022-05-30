@@ -10,7 +10,7 @@ typedef __UINT64_TYPE__ uint64_t;
 typedef __SIZE_TYPE__   size_t;
 
 /// Random 64-bit integer defining this Cannoli version
-static const uint64_t CANNOLI_VERSION = 0xf814f32b4628d058ULL;
+static const uint64_t CANNOLI_VERSION = 0x1da10aa01ee092c0ULL;
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
 /// how to invoke us

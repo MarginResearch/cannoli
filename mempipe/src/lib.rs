@@ -26,7 +26,7 @@
 //! to them.
 
 #![cfg_attr(target_family = "sushi_roll", no_std)]
-#![feature(maybe_uninit_uninit_array, array_from_fn)]
+#![feature(maybe_uninit_uninit_array)]
 #![feature(inline_const, alloc_c_string)]
 
 extern crate alloc;
