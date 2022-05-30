@@ -17,7 +17,12 @@ struct SymOff {
 
 impl std::fmt::Display for SymOff {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:#018x} ({}+{:#x})", self.addr, self.symbol, self.offset)
+        if self.offset != 0 {
+            write!(f, "{:#018x} ({}+{:#x})",
+                self.addr, self.symbol, self.offset)
+        } else {
+            write!(f, "{:#018x} ({})", self.addr, self.symbol)
+        }
     }
 }
 
