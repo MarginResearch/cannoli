@@ -142,13 +142,15 @@ impl Cannoli for Symbolizer {
         for op in trace {
             match op {
                 Operation::Exec { pc } => {
-                    println!("EXEC   @ {pc}");
+                    println!("\x1b[0;34mEXEC\x1b[0m   @ {pc}");
                 }
                 Operation::Read { pc, addr, val, sz } => {
-                    println!("READ{sz}  @ {pc} | {addr} ={val:#x}");
+                    println!("\x1b[0;32mREAD{sz}\x1b[0m  @ {pc} | \
+                        {addr} ={val:#x}");
                 }
                 Operation::Write { pc, addr, val, sz } => {
-                    println!("WRITE{sz} @ {pc} | {addr} ={val:#x}");
+                    println!("\x1b[0;31mWRITE{sz}\x1b[0m @ {pc} | \
+                        {addr} ={val:#x}");
                 }
             }
         }
