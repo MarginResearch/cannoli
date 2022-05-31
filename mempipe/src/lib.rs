@@ -547,6 +547,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
     /// atomically incrementing sequence number for the buffer that was
     /// processed. This information allows a parallel user to reorder the
     /// traces until they are sequenced.
+    #[allow(clippy::type_complexity)]
     pub fn try_recv<F, T, E>(&self, ticket: Ticket, mut func: F)
                 -> (Ticket, Option<core::result::Result<(u64, T), E>>)
             where F: FnMut(&[u8]) -> core::result::Result<T, E> {

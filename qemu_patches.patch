@@ -1,7 +1,7 @@
 From 61928f76276683059342cd077ef02749e7524776 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/8] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 1/9] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -351,7 +351,7 @@ index 0f9cfe96f2..739a4641c3 100644
 From b23f51273e9411d7a0d7808ec88ded311e05cfc7 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/8] Style cleanup, more comments
+Subject: [PATCH 2/9] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -896,7 +896,7 @@ index 739a4641c3..dde9cd89b3 100644
 From 0efc4ab316ebffdd7a67fe833afcc4458693e760 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 3/8] Added PC support to memops
+Subject: [PATCH 3/9] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1036,7 +1036,7 @@ index dde9cd89b3..590d997d65 100644
 From b3267a15063ece5a3b4f0b950ab4e32b1fba7513 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 4/8] Updated path
+Subject: [PATCH 4/9] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1062,7 +1062,7 @@ index 20dc3c68a1..a71cd470f8 100644
 From a48c630bdc849511c49866056fbea2aec6e3d061 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 5/8] Added --with-cannoli build flag
+Subject: [PATCH 5/9] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1141,7 +1141,7 @@ index a71cd470f8..657dfefc92 100644
 From 022d77fc60a9596c05c2cea6ed8a252b772b125a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
-Subject: [PATCH 6/8] Fixed cannoli PC for memory operations
+Subject: [PATCH 6/9] Fixed cannoli PC for memory operations
 
 ---
  tcg/i386/tcg-target.c.inc | 21 ++++++-----------
@@ -1313,7 +1313,7 @@ index 590d997d65..d9d035576a 100644
 From 314324d41e3082f9352993b9d1183f8c16c2c72c Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
-Subject: [PATCH 7/8] Wrap code in cannoli as needed
+Subject: [PATCH 7/9] Wrap code in cannoli as needed
 
 ---
  tcg/tcg.c | 4 ++++
@@ -1342,7 +1342,7 @@ index d9d035576a..8c508de957 100644
 From ad9c7ffa61da0d4a25f045acd126731228341bf4 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 06:05:07 -0700
-Subject: [PATCH 8/8] Fixed cannoli not flushing on longjmps and signals
+Subject: [PATCH 8/9] Fixed cannoli not flushing on longjmps and signals
 
 ---
  accel/tcg/cpu-exec-common.c | 16 ++++++++++++++++
@@ -1889,6 +1889,42 @@ index 8c508de957..6d2de178e9 100644
      /* assign output registers and emit moves if needed */
      for(i = 0; i < nb_oargs; i++) {
          arg = op->args[i];
+-- 
+2.35.1
+
+
+From fe2ffea405e35d594696ea69cfc758615b4b5a4f Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Tue, 31 May 2022 03:03:13 -0700
+Subject: [PATCH 9/9] Pass endian and arch information to cannoli
+
+---
+ linux-user/main.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/linux-user/main.c b/linux-user/main.c
+index 86238c2441..53df5d67fb 100644
+--- a/linux-user/main.c
++++ b/linux-user/main.c
+@@ -290,7 +290,8 @@ static void handle_arg_cannoli(const char *arg)
+     }
+ 
+     /* Get the entry point for Cannoli */
+-    Cannoli* (*query_version)(void) = dlsym(cannoli_lib, CANNOLI_ENTRY);
++    Cannoli* (*query_version)(const char*, int) =
++        dlsym(cannoli_lib, CANNOLI_ENTRY);
+     if(!query_version) {
+         fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
+             dlerror());
+@@ -298,7 +299,7 @@ static void handle_arg_cannoli(const char *arg)
+     }
+ 
+     /* Query binding information */
+-    cannoli = query_version();
++    cannoli = query_version(UNAME_MACHINE, TARGET_BIG_ENDIAN != 0);
+ 
+     /* Check version */
+     if(cannoli->version != CANNOLI_VERSION) {
 -- 
 2.35.1
 

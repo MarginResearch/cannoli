@@ -31,7 +31,7 @@ impl Cannoli for Benchmark {
     type Context = ();
 
     /// Create contexts
-    fn init(_: u64) -> (Self, Self::Context) {
+    fn init(_: &cannoli::ClientInfo) -> (Self, Self::Context) {
         (Benchmark {
             start:        Instant::now(),
             start_cycles: rdtsc(),

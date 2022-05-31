@@ -3,7 +3,7 @@
 //! memory accesses
 
 #![feature(asm_const, maybe_uninit_slice, inline_const, naked_functions)]
-#![feature(asm_sym)]
+#![feature(asm_sym, once_cell)]
 
 mod cannoli_memops;
 mod cannoli_internals;

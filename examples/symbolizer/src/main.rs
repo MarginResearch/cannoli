@@ -89,7 +89,7 @@ impl Cannoli for Symbolizer {
     type Context = Context;
 
     /// Load the symbol table
-    fn init(_: u64) -> (Self, Self::Context) {
+    fn init(_: &cannoli::ClientInfo) -> (Self, Self::Context) {
         // Symbols
         let mut symbols = Vec::new();
 

@@ -41,7 +41,7 @@ impl Tracer {
         let pixel = (pixel as usize) & !3;
 
         unsafe {
-            RAW_DATA[pixel + 0] |= color.2; // B
+            RAW_DATA[pixel    ] |= color.2; // B
             RAW_DATA[pixel + 1] |= color.1; // G
             RAW_DATA[pixel + 2] |= color.0; // R
             RAW_DATA[pixel + 3] |= 0x00;
@@ -53,7 +53,7 @@ impl Cannoli for Tracer {
     type Trace = Trace;
     type Context = ();
 
-    fn init(_: u64) -> (Self, Self::Context) {
+    fn init(_: &cannoli::ClientInfo) -> (Self, Self::Context) {
         (Tracer {
         }, ())
     }
@@ -157,7 +157,7 @@ impl Graph {
         }
 
         // Get the time width of the X axis
-        let start  = self.data.iter().next().unwrap().0;
+        let start  = self.data.get(0).unwrap().0;
         let end    = self.data.iter().last().unwrap().0;
         let xrange = (end - start).as_secs_f32();
 

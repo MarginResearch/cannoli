@@ -16,6 +16,8 @@ use std::io::Write;
 use std::net::TcpStream;
 use std::mem::{ManuallyDrop, size_of};
 use std::cell::RefCell;
+use std::lazy::SyncOnceCell;
+use cannoli::{Architecture, ClientConn};
 use mempipe::{SendPipe, ChunkWriter};
 
 /// Chunk size to use when streaming data over IPC
@@ -55,9 +57,49 @@ impl Default for HookState {
         let mut server = TcpStream::connect("127.0.0.1:11458")
             .expect("Cannoli: Failed to connect to Cannoli server");
 
-        // Send the uid to the server
-        server.write_all(&pipe.uid().to_le_bytes())
-            .expect("Cannoli: Failed to send UID to server");
+        // Get QEMU target information
+        let qi = QEMU_INFO.get().expect("Cannoli: QEMU_INFO not set!?");
+
+        // Get the current running threads PPID, PID, and TID
+        let (ppid, pid, tid) = unsafe {(
+            libc::getppid(), libc::getpid(), libc::gettid(),
+        )};
+
+        // Get the executable name of the parent
+        let pcomm = std::fs::read(format!("/proc/{ppid}/comm"))
+            .expect("Cannoli: Failed to read `/proc/<ppid>/comm`");
+
+        // Get the executable name
+        let comm = std::fs::read(format!("/proc/{pid}/comm"))
+            .expect("Cannoli: Failed to read `/proc/<pid>/comm`");
+
+        // Construct the payload to send to the server
+        let header = ClientConn {
+            uid:        pipe.uid(),
+            arch:       qi.arch       as i32,
+            big_endian: qi.big_endian as i32,
+            pcomm_len:  pcomm.len()   as u32,
+            comm_len:   comm.len()    as u32,
+            ppid,
+            pid,
+            tid,
+        };
+
+        // Construct the header
+        let mut payload = Vec::new();
+        payload.extend_from_slice(unsafe {
+            std::slice::from_raw_parts(
+                &header as *const ClientConn as *const u8,
+                std::mem::size_of_val(&header))
+        });
+
+        // Add the parent and self comm values
+        payload.extend_from_slice(&pcomm);
+        payload.extend_from_slice(&comm);
+
+        // Send the data!
+        server.write_all(&payload)
+            .expect("Cannoli: Failed to send initial greeting");
 
         Self {
             active_buffer: None,
@@ -66,6 +108,24 @@ impl Default for HookState {
         }
     }
 }
+
+/// Global state about the QEMU process we're in. This can only hold values
+/// which are constant through execution of the target.
+///
+/// These are initialized when QEMU calls `query_version`, and thus, only
+/// include information about the main thread
+#[derive(Debug)]
+struct QemuInfo {
+    /// The target architecture, converted to the enum from the `UNAME_MACHINE`
+    /// define in QEMU
+    arch: Architecture,
+
+    /// Tracks if this is a big endian target
+    big_endian: bool,
+}
+
+/// Global state holding information about the QEMU being used
+static QEMU_INFO: SyncOnceCell<QemuInfo> = SyncOnceCell::new();
 
 thread_local! {
     /// The thread-local QEMU hook state
@@ -126,7 +186,7 @@ macro_rules! create_bitness {
 /// Called by QEMU to initialize this library, we also return version
 /// information to QEMU so it knows that we're using the right version
 #[no_mangle]
-extern fn $init() -> &'static $cannoli {
+extern fn $init(arch: *const i8, big_endian: i32) -> &'static $cannoli {
     /// Bindings information for QEMU
     const BINDINGS: $cannoli = $cannoli {
         version:          CANNOLI_VERSION,
@@ -135,6 +195,18 @@ extern fn $init() -> &'static $cannoli {
         jit_entry:        Some($entry),
         jit_exit:         Some($exit),
     };
+
+    // Convert architecture string to enum
+    let arch = unsafe { Architecture::from_cstr(arch) };
+
+    // Convert big endian to a bool
+    let big_endian = big_endian != 0;
+
+    // Set up global QEMU info
+    QEMU_INFO.set(QemuInfo {
+        arch,
+        big_endian,
+    }).expect("Cannoli: Whoa, set QEMU info twice!?");
 
     &BINDINGS
 }

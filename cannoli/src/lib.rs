@@ -4,7 +4,8 @@
 #![feature(array_chunks, scoped_threads)]
 
 use std::io::Read;
-use std::mem::size_of;
+use std::ffi::CStr;
+use std::mem::{size_of, MaybeUninit};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Mutex;
 use std::time::{Instant, Duration};
@@ -45,138 +46,282 @@ const CHUNK_SIZE: usize = 256 * 1024;
 /// Number of chunks to use with IPC
 const NUM_BUFFERS: usize = 16;
 
+/// Header sent when a client connects
+///
+/// Must only contain plain-old-data otherwise you will break the unsafe
+/// serialization and deserialization we use :)
+///
+/// This also cannot have unaligned fields that cause padding bytes
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct ClientConn {
+    /// UID for the pipe
+    pub uid: u64,
+
+    /// Architecture
+    pub arch: i32,
+
+    /// Big endian flag
+    pub big_endian: i32,
+
+    /// Parent process ID
+    pub ppid: i32,
+
+    /// Process ID
+    pub pid: i32,
+
+    /// Thread ID
+    pub tid: i32,
+
+    /// Length of the parent comm (in bytes)
+    pub pcomm_len: u32,
+
+    /// Length of the comm (in bytes)
+    pub comm_len: u32,
+}
+
+/// Different QEMU target architectures
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Architecture {
+    Aarch64,
+    Aarch64be,
+    Alpha,
+    Armv5teb,
+    Armv5tel,
+    Cris,
+    Hexagon,
+    I386,
+    I686,
+    M68k,
+    Microblaze,
+    Mips,
+    Mips64,
+    Nios2,
+    Openrisc,
+    Parisc,
+    Ppc,
+    Ppc64,
+    Ppc64le,
+    Riscv32,
+    Riscv64,
+    S390x,
+    Sh4,
+    Sparc,
+    Sparc64,
+    X86_64,
+    Xtensa,
+}
+
+impl From<i32> for Architecture {
+    fn from(val: i32) -> Self {
+        match val {
+             0 => Self::Aarch64,
+             1 => Self::Aarch64be,
+             2 => Self::Alpha,
+             3 => Self::Armv5teb,
+             4 => Self::Armv5tel,
+             5 => Self::Cris,
+             6 => Self::Hexagon,
+             7 => Self::I386,
+             8 => Self::I686,
+             9 => Self::M68k,
+            10 => Self::Microblaze,
+            11 => Self::Mips,
+            12 => Self::Mips64,
+            13 => Self::Nios2,
+            14 => Self::Openrisc,
+            15 => Self::Parisc,
+            16 => Self::Ppc,
+            17 => Self::Ppc64,
+            18 => Self::Ppc64le,
+            19 => Self::Riscv32,
+            20 => Self::Riscv64,
+            21 => Self::S390x,
+            22 => Self::Sh4,
+            23 => Self::Sparc,
+            24 => Self::Sparc64,
+            25 => Self::X86_64,
+            26 => Self::Xtensa,
+            _  => panic!("Cannoli: Unhandled architecture ID {}", val),
+        }
+    }
+}
+
+impl Architecture {
+    /// Convert a `UNAME_MACHINE` C-string to an [`Architecture`]
+    ///
+    /// # Safety
+    ///
+    /// Expects a pointer to a valid null-terminatedf string
+    pub unsafe fn from_cstr(arch: *const i8) -> Self {
+        let arch = CStr::from_ptr(arch).to_str().expect(
+            "Cannoli: Invalid string passed to Architecture::from_cstr()");
+        match arch {
+            "aarch64"    => Architecture::Aarch64,
+            "aarch64_be" => Architecture::Aarch64be,
+            "alpha"      => Architecture::Alpha,
+            "armv5teb"   => Architecture::Armv5teb,
+            "armv5tel"   => Architecture::Armv5tel,
+            "cris"       => Architecture::Cris,
+            "hexagon"    => Architecture::Hexagon,
+            "i386"       => Architecture::I386,
+            "i686"       => Architecture::I686,
+            "m68k"       => Architecture::M68k,
+            "microblaze" => Architecture::Microblaze,
+            "mips"       => Architecture::Mips,
+            "mips64"     => Architecture::Mips64,
+            "nios2"      => Architecture::Nios2,
+            "openrisc"   => Architecture::Openrisc,
+            "parisc"     => Architecture::Parisc,
+            "ppc"        => Architecture::Ppc,
+            "ppc64"      => Architecture::Ppc64,
+            "ppc64le"    => Architecture::Ppc64le,
+            "riscv32"    => Architecture::Riscv32,
+            "riscv64"    => Architecture::Riscv64,
+            "s390x"      => Architecture::S390x,
+            "sh4"        => Architecture::Sh4,
+            "sparc"      => Architecture::Sparc,
+            "sparc64"    => Architecture::Sparc64,
+            "x86_64"     => Architecture::X86_64,
+            "xtensa"     => Architecture::Xtensa,
+            _ => panic!("Cannoli: Unhandled architecture name {}", arch),
+        }
+    }
+}
+
+/// Gross macro to deserialize multiple plain-old-data types into a tuple
+/// with only one length check.
+///
+/// This is only safe if you pass in plain-old-data types.
+macro_rules! consume {
+    ($payload:expr, $($ty:ty),+) => {{
+        // Get the size of the payload to deserialize, in bytes
+        const OP_SIZE: usize = $(
+            size_of::<$ty>() +
+        )+ 0;
+
+        // Get pointer to payload
+        let ptr = $payload.as_ptr();
+
+        // Advance payload pointer, also performs the length check
+        $payload = $payload.get(OP_SIZE..)
+            .ok_or(Error::BufferTruncated)?;
+
+        // Create a temporary value tracking how many bytes we've read so
+        // far
+        let mut _tmp = 0;
+
+        // Ignore clippy here, I don't know if there's a better way to
+        // express what we're doing to the compiler in this case
+        #[allow(clippy::mixed_read_write_in_expression)]
+        unsafe {
+            (
+                // For each requested type, read it!
+                $(
+                    core::ptr::read_unaligned(
+                        ptr.offset({
+                            // Save off the current offset
+                            let x = _tmp;
+
+                            // Advance the index
+                            _tmp += size_of::<$ty>() as isize;
+
+                            // Return the offset to read from
+                            x
+                        }) as *const $ty),
+                )+
+            )
+        }
+    }}
+}
+
 /// Given a payload of bytes that came from the IPC channel, deserialize it and
 /// invoke callbacks based on the payload
 fn parse_payload<T: Cannoli>(user: &T::Context, trace: &mut Vec<T::Trace>,
         mut payload: &[u8]) -> Result<()> {
-    /// Gross macro to deserialize multiple plain-old-data types into a tuple
-    /// with only one length check.
-    ///
-    /// This is only safe if you pass in plain-old-data types.
-    macro_rules! consume {
-        ($($ty:ty),+) => {{
-            // Get the size of the payload to deserialize, in bytes
-            const OP_SIZE: usize = $(
-                size_of::<$ty>() +
-            )+ 0;
-
-            // Get pointer to payload
-            let ptr = payload.as_ptr();
-
-            // Advance payload pointer, also performs the length check
-            payload = payload.get(OP_SIZE..)
-                .ok_or(Error::BufferTruncated)?;
-
-            // Create a temporary value tracking how many bytes we've read so
-            // far
-            let mut _tmp = 0;
-
-            // Ignore clippy here, I don't know if there's a better way to
-            // express what we're doing to the compiler in this case
-            #[allow(clippy::eval_order_dependence)]
-            unsafe {
-                (
-                    // For each requested type, read it!
-                    $(
-                        core::ptr::read_unaligned(
-                            ptr.offset({
-                                // Save off the current offset
-                                let x = _tmp;
-
-                                // Advance the index
-                                _tmp += size_of::<$ty>() as isize;
-
-                                // Return the offset to read from
-                                x
-                            }) as *const $ty),
-                    )+
-                )
-            }
-        }}
-    }
-
     // Clear the trace
     trace.clear();
 
     // Parse the payload while there's more data
     while !payload.is_empty() {
         // Get the opcode
-        let op: u8 = consume!(u8).0;
+        let op: u8 = consume!(payload, u8).0;
 
         // Handle each opcode
         let event = match op {
             0x00 => { // Exec32
-                T::exec(user, consume!(u32).0 as u64)
+                T::exec(user, consume!(payload, u32).0 as u64)
             },
             0x80 => { // Exec64
-                T::exec(user, consume!(u64).0)
+                T::exec(user, consume!(payload, u64).0)
             },
 
             0x11 => { // Read8_32
-                let (addr, val, pc) = consume!(u32, u8, u32);
+                let (addr, val, pc) = consume!(payload, u32, u8, u32);
                 T::read(user, pc as u64, addr as u64, val as u64, 1)
             },
             0x12 => { // Read16_32
-                let (addr, val, pc) = consume!(u32, u16, u32);
+                let (addr, val, pc) = consume!(payload, u32, u16, u32);
                 T::read(user, pc as u64, addr as u64, val as u64, 2)
             },
             0x14 => { // Read32_32
-                let (addr, val, pc) = consume!(u32, u32, u32);
+                let (addr, val, pc) = consume!(payload, u32, u32, u32);
                 T::read(user, pc as u64, addr as u64, val as u64, 4)
             },
             0x18 => { // Read64_32
-                let (addr, val, pc) = consume!(u32, u64, u32);
+                let (addr, val, pc) = consume!(payload, u32, u64, u32);
                 T::read(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             0x21 => { // Write8_32
-                let (addr, val, pc) = consume!(u32, u8, u32);
+                let (addr, val, pc) = consume!(payload, u32, u8, u32);
                 T::write(user, pc as u64, addr as u64, val as u64, 1)
             },
             0x22 => { // Write16_32
-                let (addr, val, pc) = consume!(u32, u16, u32);
+                let (addr, val, pc) = consume!(payload, u32, u16, u32);
                 T::write(user, pc as u64, addr as u64, val as u64, 2)
             },
             0x24 => { // Write32_32
-                let (addr, val, pc) = consume!(u32, u32, u32);
+                let (addr, val, pc) = consume!(payload, u32, u32, u32);
                 T::write(user, pc as u64, addr as u64, val as u64, 4)
             },
             0x28 => { // Write64_32
-                let (addr, val, pc) = consume!(u32, u64, u32);
+                let (addr, val, pc) = consume!(payload, u32, u64, u32);
                 T::write(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             0x91 => { // Read8_64
-                let (addr, val, pc) = consume!(u64, u8, u64);
+                let (addr, val, pc) = consume!(payload, u64, u8, u64);
                 T::read(user, pc as u64, addr as u64, val as u64, 1)
             },
             0x92 => { // Read16_64
-                let (addr, val, pc) = consume!(u64, u16, u64);
+                let (addr, val, pc) = consume!(payload, u64, u16, u64);
                 T::read(user, pc as u64, addr as u64, val as u64, 2)
             },
             0x94 => { // Read32_64
-                let (addr, val, pc) = consume!(u64, u32, u64);
+                let (addr, val, pc) = consume!(payload, u64, u32, u64);
                 T::read(user, pc as u64, addr as u64, val as u64, 4)
             },
             0x98 => { // Read64_64
-                let (addr, val, pc) = consume!(u64, u64, u64);
+                let (addr, val, pc) = consume!(payload, u64, u64, u64);
                 T::read(user, pc as u64, addr as u64, val as u64, 8)
             },
 
             0xa1 => { // Write8_64
-                let (addr, val, pc) = consume!(u64, u8, u64);
+                let (addr, val, pc) = consume!(payload, u64, u8, u64);
                 T::write(user, pc as u64, addr as u64, val as u64, 1)
             },
             0xa2 => { // Write16_64
-                let (addr, val, pc) = consume!(u64, u16, u64);
+                let (addr, val, pc) = consume!(payload, u64, u16, u64);
                 T::write(user, pc as u64, addr as u64, val as u64, 2)
             },
             0xa4 => { // Write32_64
-                let (addr, val, pc) = consume!(u64, u32, u64);
+                let (addr, val, pc) = consume!(payload, u64, u32, u64);
                 T::write(user, pc as u64, addr as u64, val as u64, 4)
             },
             0xa8 => { // Write64_64
-                let (addr, val, pc) = consume!(u64, u64, u64);
+                let (addr, val, pc) = consume!(payload, u64, u64, u64);
                 T::write(user, pc as u64, addr as u64, val as u64, 8)
             },
 
@@ -195,10 +340,40 @@ fn parse_payload<T: Cannoli>(user: &T::Context, trace: &mut Vec<T::Trace>,
     Ok(())
 }
 
+/// Information about a newly connected client
+#[derive(Debug, Clone)]
+pub struct ClientInfo {
+    /// UID of the communication stream
+    pub uid: u64,
+
+    /// Architecture of the target
+    pub arch: Architecture,
+
+    /// Is the target big endian?
+    pub big_endian: bool,
+
+    /// Parent process ID
+    pub ppid: i32,
+
+    /// Process ID
+    pub pid: i32,
+
+    /// Thread ID
+    pub tid: i32,
+
+    /// Parent comm, `/proc/ppid/comm`, this is the raw value read from `comm`
+    /// and may include weird stuff like newlines
+    pub pcomm: Option<String>,
+
+    /// comm, `/proc/pid/comm`, this is the raw value read from `comm`
+    /// and may include weird stuff like newlines
+    pub comm: Option<String>,
+}
+
 /// Handle a newly connected client. This is run on a new thread each time a
 /// new TCP connection comes in.
 fn handle_client<T: Cannoli + 'static>(
-        stream: TcpStream, num_threads: usize, uid: u64) -> Result<()> {
+        stream: TcpStream, num_threads: usize, ci: &ClientInfo) -> Result<()> {
     /// Storage for the mini state-machine we use to sequence traces
     struct State<T: Cannoli + 'static> {
         /// Next sequence number we are looking for to report traces
@@ -213,7 +388,7 @@ fn handle_client<T: Cannoli + 'static>(
     }
 
     // Create the IPC connection to the UID we got
-    let pipe = RecvPipe::<CHUNK_SIZE, NUM_BUFFERS>::open(uid)
+    let pipe = RecvPipe::<CHUNK_SIZE, NUM_BUFFERS>::open(ci.uid)
         .map_err(Error::OpenPipe)?;
 
     // Make the stream nonblocking
@@ -228,7 +403,7 @@ fn handle_client<T: Cannoli + 'static>(
     let pipe = &pipe;
 
     // Create a new instance of the user's structure
-    let (user_type, user_ctxt) = T::init(uid);
+    let (user_type, user_ctxt) = T::init(ci);
     let user_ctxt = &user_ctxt;
 
     // Create the sequencing state machine
@@ -373,19 +548,56 @@ pub fn create_cannoli<T: Cannoli + 'static>(threads: usize) -> Result<()> {
                 // Get access to the stream
                 let mut stream = stream.expect("Failed to get TCP stream");
 
-                // Get the UID for this connection
-                let mut uid = [0u8; size_of::<u64>()];
-                stream.read_exact(&mut uid)
-                    .expect("Failed to get uid for IPC");
-                let uid = u64::from_le_bytes(uid);
+                // Get the header
+                let mut header: MaybeUninit<ClientConn> =
+                    MaybeUninit::uninit();
+                stream.read_exact(unsafe {
+                    core::slice::from_raw_parts_mut(
+                        header.as_mut_ptr() as *mut u8,
+                        core::mem::size_of_val(&header))
+                }).expect("Failed to get client header");
 
-                println!("New client {:#x}", uid);
+                // Get the actual header now that it's initialized
+                let header: ClientConn = unsafe { header.assume_init() };
+
+                // Get the pcomm and comm
+                let mut comm =
+                    vec![0u8; header.pcomm_len as usize +
+                              header.comm_len  as usize];
+                stream.read_exact(&mut comm)
+                    .expect("Failed to get client pcomm and comm");
+
+                // Construct client information
+                let ci = ClientInfo {
+                    // IPC pipe UID
+                    uid: header.uid,
+
+                    // Architecture
+                    arch: Architecture::from(header.arch),
+
+                    // Endianness
+                    big_endian: header.big_endian != 0,
+
+                    // PIDs
+                    ppid: header.ppid,
+                    pid:  header.pid,
+                    tid:  header.tid,
+
+                    pcomm: std::str::from_utf8(
+                        &comm[..header.pcomm_len as usize])
+                        .ok().map(|x| x.to_string()),
+                    comm: std::str::from_utf8(
+                        &comm[header.pcomm_len as usize..])
+                        .ok().map(|x| x.to_string()),
+                };
+
+                println!("New client {:#?}", ci);
 
                 // Handle the client
-                handle_client::<T>(stream, threads, uid)
+                handle_client::<T>(stream, threads, &ci)
                     .expect("Failed to handle client");
 
-                println!("Lost client {:#x}", uid);
+                println!("Lost client {:#?}", ci);
             });
         }
 
@@ -405,9 +617,9 @@ pub trait Cannoli: Send + Sync {
     /// executed in parallel
     type Context: Sync;
 
-    /// Create a new `Self` for a new IPC session with `uid`. You probably
-    /// don't need UID, so you can ignore it, but I provided it anyways.
-    fn init(uid: u64) -> (Self, Self::Context) where Self: Sized;
+    /// Create a new `Self` for a new IPC session. See [`ClientInfo`] for the
+    /// information you are provided
+    fn init(ci: &ClientInfo) -> (Self, Self::Context) where Self: Sized;
 
     /// Invoked when a PC execution opcode was lifted from the trace
     ///

@@ -10,7 +10,7 @@ typedef __UINT64_TYPE__ uint64_t;
 typedef __SIZE_TYPE__   size_t;
 
 /// Random 64-bit integer defining this Cannoli version
-static const uint64_t CANNOLI_VERSION = 0xd0a4509ffe852f3ULL;
+static const uint64_t CANNOLI_VERSION = 0x9ee44dcf4508ae3eULL;
 
 /// Poison value to indicate that the trace buffer is not actively set
 static const uint64_t CANNOLI_POISON = 0x5ac91c0a3c7b863eULL;
