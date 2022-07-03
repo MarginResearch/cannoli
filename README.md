@@ -54,7 +54,7 @@ Apply patch from `qemu_patches.patch`
 
 ```
 cd QEMU
-git am </path/to/cannoli>/qemu_patches.patch
+git am --3way </path/to/cannoli>/qemu_patches.patch
 ```
 
 Build QEMU for your desired targets (example mipsel and riscv64)

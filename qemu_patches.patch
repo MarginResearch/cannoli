@@ -1,4 +1,4 @@
-From 61928f76276683059342cd077ef02749e7524776 Mon Sep 17 00:00:00 2001
+From db2ba339ce8f84c0cf237b19e1d04cddf5a7b359 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
 Subject: [PATCH 1/9] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
@@ -32,12 +32,12 @@ index 26a70526f1..063c4c18d1 100644
  #define MAX_OP_PER_INSTR 266
  
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 7ca48664e4..481f33e121 100644
+index e44bdb17b8..12b9dd2e17 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -54,6 +54,10 @@
- #include "loader.h"
- #include "user-mmap.h"
+@@ -58,6 +58,10 @@
+ #include "semihosting/semihost.h"
+ #endif
  
 +#ifdef CANNOLI
 +#include <dlfcn.h>
@@ -46,7 +46,7 @@ index 7ca48664e4..481f33e121 100644
  #ifndef AT_FLAGS_PRESERVE_ARGV0
  #define AT_FLAGS_PRESERVE_ARGV0_BIT 0
  #define AT_FLAGS_PRESERVE_ARGV0 (1 << AT_FLAGS_PRESERVE_ARGV0_BIT)
-@@ -86,6 +90,13 @@ static bool enable_strace;
+@@ -90,6 +94,13 @@ static bool enable_strace;
  static int last_log_mask;
  static const char *last_log_filename;
  
@@ -60,7 +60,7 @@ index 7ca48664e4..481f33e121 100644
  /*
   * When running 32-on-64 we should make sure we can fit all of the possible
   * guest address space into a contiguous chunk of virtual host memory.
-@@ -260,6 +271,37 @@ static void handle_arg_log_filename(const char *arg)
+@@ -264,6 +275,37 @@ static void handle_arg_log_filename(const char *arg)
      last_log_filename = arg;
  }
  
@@ -98,7 +98,7 @@ index 7ca48664e4..481f33e121 100644
  static void handle_arg_set_env(const char *arg)
  {
      char *r, *p, *token;
-@@ -463,6 +505,10 @@ static const struct qemu_argument arg_table[] = {
+@@ -467,6 +509,10 @@ static const struct qemu_argument arg_table[] = {
       "range[,...]","filter logging based on address range"},
      {"D",          "QEMU_LOG_FILENAME", true, handle_arg_log_filename,
       "logfile",     "write logs to 'logfile' (default stderr)"},
@@ -110,7 +110,7 @@ index 7ca48664e4..481f33e121 100644
       "pagesize",   "set the host page size to 'pagesize'"},
      {"singlestep", "QEMU_SINGLESTEP",  false, handle_arg_singlestep,
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index b5c6159853..0e7d88c67e 100644
+index d52206ba4d..687fc2cc09 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
 @@ -45,9 +45,11 @@ static const int tcg_target_reg_alloc_order[] = {
@@ -348,7 +348,7 @@ index 0f9cfe96f2..739a4641c3 100644
 2.35.1
 
 
-From b23f51273e9411d7a0d7808ec88ded311e05cfc7 Mon Sep 17 00:00:00 2001
+From 03a6217a83477ea02d0fc09559839d36d4c24f91 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
 Subject: [PATCH 2/9] Style cleanup, more comments
@@ -392,11 +392,11 @@ index 063c4c18d1..20dc3c68a1 100644
  /* XXX: make safe guess about sizes */
  #define MAX_OP_PER_INSTR 266
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 481f33e121..86238c2441 100644
+index 12b9dd2e17..06e7f0fbbc 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -55,8 +55,11 @@
- #include "user-mmap.h"
+@@ -59,8 +59,11 @@
+ #endif
  
  #ifdef CANNOLI
 +/*
@@ -408,7 +408,7 @@ index 481f33e121..86238c2441 100644
  
  #ifndef AT_FLAGS_PRESERVE_ARGV0
  #define AT_FLAGS_PRESERVE_ARGV0_BIT 0
-@@ -92,10 +95,10 @@ static const char *last_log_filename;
+@@ -96,10 +99,10 @@ static const char *last_log_filename;
  
  #ifdef CANNOLI
  /*
@@ -421,7 +421,7 @@ index 481f33e121..86238c2441 100644
  
  /*
   * When running 32-on-64 we should make sure we can fit all of the possible
-@@ -272,16 +275,21 @@ static void handle_arg_log_filename(const char *arg)
+@@ -276,16 +279,21 @@ static void handle_arg_log_filename(const char *arg)
  }
  
  #ifdef CANNOLI
@@ -445,7 +445,7 @@ index 481f33e121..86238c2441 100644
      Cannoli* (*query_version)(void) = dlsym(cannoli_lib, CANNOLI_ENTRY);
      if(!query_version) {
          fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
-@@ -289,10 +297,10 @@ static void handle_arg_cannoli(const char *arg)
+@@ -293,10 +301,10 @@ static void handle_arg_cannoli(const char *arg)
          exit(EXIT_FAILURE);
      }
  
@@ -458,7 +458,7 @@ index 481f33e121..86238c2441 100644
      if(cannoli->version != CANNOLI_VERSION) {
          fprintf(stderr, "Cannoli: Version mismatch, expected %" PRIx64
              ", got %" PRIx64 "\n",
-@@ -300,7 +308,7 @@ static void handle_arg_cannoli(const char *arg)
+@@ -304,7 +312,7 @@ static void handle_arg_cannoli(const char *arg)
          exit(EXIT_FAILURE);
      }
  }
@@ -468,7 +468,7 @@ index 481f33e121..86238c2441 100644
  static void handle_arg_set_env(const char *arg)
  {
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index 0e7d88c67e..99168526d6 100644
+index 687fc2cc09..ac71677f4f 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
 @@ -46,10 +46,14 @@ static const int tcg_target_reg_alloc_order[] = {
@@ -893,7 +893,7 @@ index 739a4641c3..dde9cd89b3 100644
 2.35.1
 
 
-From 0efc4ab316ebffdd7a67fe833afcc4458693e760 Mon Sep 17 00:00:00 2001
+From c06dde5917c708249d956983fbf4338635760c39 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
 Subject: [PATCH 3/9] Added PC support to memops
@@ -904,7 +904,7 @@ Subject: [PATCH 3/9] Added PC support to memops
  2 files changed, 57 insertions(+), 2 deletions(-)
 
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index 99168526d6..ae8f662c7f 100644
+index ac71677f4f..dac39484a5 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
 @@ -2213,7 +2213,13 @@ static void tcg_out_qemu_ld_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
@@ -1033,7 +1033,7 @@ index dde9cd89b3..590d997d65 100644
 2.35.1
 
 
-From b3267a15063ece5a3b4f0b950ab4e32b1fba7513 Mon Sep 17 00:00:00 2001
+From a9c5d0bc612445620a03155e8653d7a071be2c5e Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
 Subject: [PATCH 4/9] Updated path
@@ -1059,7 +1059,7 @@ index 20dc3c68a1..a71cd470f8 100644
 2.35.1
 
 
-From a48c630bdc849511c49866056fbea2aec6e3d061 Mon Sep 17 00:00:00 2001
+From 65a74b09b31c70fbbb14bad0a4707d9ee2addd74 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
 Subject: [PATCH 5/9] Added --with-cannoli build flag
@@ -1070,18 +1070,18 @@ Subject: [PATCH 5/9] Added --with-cannoli build flag
  2 files changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/configure b/configure
-index 103a7b02e8..024a5e39d0 100755
+index 76728b31f7..0287a4aba0 100755
 --- a/configure
 +++ b/configure
-@@ -299,6 +299,7 @@ plugins="$default_feature"
+@@ -313,6 +313,7 @@ plugins="$default_feature"
  meson=""
  meson_args=""
  ninja=""
 +cannoli=""
  bindir="bin"
  skip_meson=no
- 
-@@ -858,6 +859,8 @@ for opt do
+ vfio_user_server="disabled"
+@@ -875,6 +876,8 @@ for opt do
    ;;
    --with-coroutine=*) coroutine="$optarg"
    ;;
@@ -1090,7 +1090,7 @@ index 103a7b02e8..024a5e39d0 100755
    --disable-zlib-test)
    ;;
    --disable-virtio-blk-data-plane|--enable-virtio-blk-data-plane)
-@@ -1044,6 +1047,7 @@ Advanced options (experts only):
+@@ -1052,6 +1055,7 @@ Advanced options (experts only):
    --disable-werror         disable compilation abort on warning
    --disable-stack-protector disable compiler-provided stack protection
    --cpu=CPU                Build for host CPU [$cpu]
@@ -1098,7 +1098,7 @@ index 103a7b02e8..024a5e39d0 100755
    --with-coroutine=BACKEND coroutine backend. Supported options:
                             ucontext, sigaltstack, windows
    --enable-plugins
-@@ -2001,6 +2005,11 @@ if [ "$bsd" = "yes" ] ; then
+@@ -2379,6 +2383,11 @@ if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
  fi
  
@@ -1138,7 +1138,7 @@ index a71cd470f8..657dfefc92 100644
 2.35.1
 
 
-From 022d77fc60a9596c05c2cea6ed8a252b772b125a Mon Sep 17 00:00:00 2001
+From 6a05e5fc38509037e06bc290b112bf0614e78f90 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
 Subject: [PATCH 6/9] Fixed cannoli PC for memory operations
@@ -1149,7 +1149,7 @@ Subject: [PATCH 6/9] Fixed cannoli PC for memory operations
  2 files changed, 37 insertions(+), 31 deletions(-)
 
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index ae8f662c7f..874e43be29 100644
+index dac39484a5..82ea765c01 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
 @@ -2476,9 +2476,16 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
@@ -1310,7 +1310,7 @@ index 590d997d65..d9d035576a 100644
 2.35.1
 
 
-From 314324d41e3082f9352993b9d1183f8c16c2c72c Mon Sep 17 00:00:00 2001
+From d18c3281c03bed3d5385f8dbff6cd6a4557b1397 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
 Subject: [PATCH 7/9] Wrap code in cannoli as needed
@@ -1339,7 +1339,7 @@ index d9d035576a..8c508de957 100644
 2.35.1
 
 
-From ad9c7ffa61da0d4a25f045acd126731228341bf4 Mon Sep 17 00:00:00 2001
+From d02ca53c09b9920200c170b72df54ad8d557eb7e Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 06:05:07 -0700
 Subject: [PATCH 8/9] Fixed cannoli not flushing on longjmps and signals
@@ -1406,7 +1406,7 @@ index be6fe45aa5..e74228fb5b 100644
      cpu->can_do_io = 1;
      siglongjmp(cpu->jmp_env, 1);
 diff --git a/accel/tcg/cpu-exec.c b/accel/tcg/cpu-exec.c
-index 635aeecc0a..affc38ce5b 100644
+index a565a3f8ec..5df18c2bc8 100644
 --- a/accel/tcg/cpu-exec.c
 +++ b/accel/tcg/cpu-exec.c
 @@ -352,6 +352,11 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
@@ -1505,10 +1505,10 @@ index d0abc949a8..f54fb0f15f 100644
  
  /**
 diff --git a/target/arm/cpu.h b/target/arm/cpu.h
-index 18ca61e8e2..a919ffdc48 100644
+index 4a4342f262..3df7aff7cd 100644
 --- a/target/arm/cpu.h
 +++ b/target/arm/cpu.h
-@@ -746,6 +746,13 @@ typedef struct CPUArchState {
+@@ -766,6 +766,13 @@ typedef struct CPUArchState {
      /* Linux syscall tagged address support */
      bool tagged_addr_enable;
  #endif
@@ -1523,7 +1523,7 @@ index 18ca61e8e2..a919ffdc48 100644
  
  static inline void set_feature(CPUARMState *env, int feature)
 diff --git a/target/avr/cpu.h b/target/avr/cpu.h
-index d304f33301..53a0034682 100644
+index 96419c0c2b..59daaa144f 100644
 --- a/target/avr/cpu.h
 +++ b/target/avr/cpu.h
 @@ -135,6 +135,13 @@ typedef struct CPUArchState {
@@ -1595,10 +1595,10 @@ index 6f3b6beecf..3d8a6e599c 100644
  
  /**
 diff --git a/target/i386/cpu.h b/target/i386/cpu.h
-index 0d528ac58f..a2ce2aaebf 100644
+index 82004b65b9..22e6e7d9c0 100644
 --- a/target/i386/cpu.h
 +++ b/target/i386/cpu.h
-@@ -1771,6 +1771,13 @@ typedef struct CPUArchState {
+@@ -1775,6 +1775,13 @@ typedef struct CPUArchState {
      TPRAccess tpr_access_type;
  
      unsigned nr_dies;
@@ -1613,10 +1613,10 @@ index 0d528ac58f..a2ce2aaebf 100644
  
  struct kvm_msrs;
 diff --git a/target/m68k/cpu.h b/target/m68k/cpu.h
-index 9b3bf7a448..855acdb2af 100644
+index 4d8f48e8c7..0eff99a80d 100644
 --- a/target/m68k/cpu.h
 +++ b/target/m68k/cpu.h
-@@ -149,6 +149,13 @@ typedef struct CPUArchState {
+@@ -155,6 +155,13 @@ typedef struct CPUArchState {
  
      /* Fields from here on are preserved across CPU reset. */
      uint32_t features;
@@ -1649,10 +1649,10 @@ index 1e84dd8f47..ea21031cb2 100644
  
  /*
 diff --git a/target/mips/cpu.h b/target/mips/cpu.h
-index 5335ac10a3..433112d479 100644
+index 0a085643a3..f7d202cb66 100644
 --- a/target/mips/cpu.h
 +++ b/target/mips/cpu.h
-@@ -1160,6 +1160,13 @@ typedef struct CPUArchState {
+@@ -1161,6 +1161,13 @@ typedef struct CPUArchState {
      QEMUTimer *timer; /* Internal timer */
      target_ulong exception_base; /* ExceptionBase input to the core */
      uint64_t cp0_count_ns; /* CP0_Count clock period (in nanoseconds) */
@@ -1703,10 +1703,10 @@ index b9584f10d4..355084f27f 100644
  
  /**
 diff --git a/target/ppc/cpu.h b/target/ppc/cpu.h
-index 48596cfb25..73b752b732 100644
+index 6d78078f37..e8def9140d 100644
 --- a/target/ppc/cpu.h
 +++ b/target/ppc/cpu.h
-@@ -1233,6 +1233,13 @@ struct CPUArchState {
+@@ -1237,6 +1237,13 @@ struct CPUArchState {
       * running cycles.
       */
      uint64_t pmu_base_time;
@@ -1721,10 +1721,10 @@ index 48596cfb25..73b752b732 100644
  
  #define SET_FIT_PERIOD(a_, b_, c_, d_)          \
 diff --git a/target/riscv/cpu.h b/target/riscv/cpu.h
-index fe6c9a2c92..bed470c3aa 100644
+index 5c7acc055a..e6aef370f5 100644
 --- a/target/riscv/cpu.h
 +++ b/target/riscv/cpu.h
-@@ -341,6 +341,13 @@ struct CPUArchState {
+@@ -369,6 +369,13 @@ struct CPUArchState {
      uint64_t kvm_timer_compare;
      uint64_t kvm_timer_state;
      uint64_t kvm_timer_frequency;
@@ -1893,7 +1893,7 @@ index 8c508de957..6d2de178e9 100644
 2.35.1
 
 
-From fe2ffea405e35d594696ea69cfc758615b4b5a4f Mon Sep 17 00:00:00 2001
+From d72d8dc60167c510867696d623712843f4f39c19 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Tue, 31 May 2022 03:03:13 -0700
 Subject: [PATCH 9/9] Pass endian and arch information to cannoli
@@ -1903,10 +1903,10 @@ Subject: [PATCH 9/9] Pass endian and arch information to cannoli
  1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 86238c2441..53df5d67fb 100644
+index 06e7f0fbbc..472233097e 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -290,7 +290,8 @@ static void handle_arg_cannoli(const char *arg)
+@@ -294,7 +294,8 @@ static void handle_arg_cannoli(const char *arg)
      }
  
      /* Get the entry point for Cannoli */
@@ -1916,7 +1916,7 @@ index 86238c2441..53df5d67fb 100644
      if(!query_version) {
          fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
              dlerror());
-@@ -298,7 +299,7 @@ static void handle_arg_cannoli(const char *arg)
+@@ -302,7 +303,7 @@ static void handle_arg_cannoli(const char *arg)
      }
  
      /* Query binding information */
