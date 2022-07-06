@@ -16,7 +16,7 @@ use std::io::Write;
 use std::net::TcpStream;
 use std::mem::{ManuallyDrop, size_of};
 use std::cell::RefCell;
-use std::lazy::SyncOnceCell;
+use std::sync::OnceLock;
 use cannoli::{Architecture, ClientConn};
 use mempipe::{SendPipe, ChunkWriter};
 
@@ -125,7 +125,7 @@ struct QemuInfo {
 }
 
 /// Global state holding information about the QEMU being used
-static QEMU_INFO: SyncOnceCell<QemuInfo> = SyncOnceCell::new();
+static QEMU_INFO: OnceLock<QemuInfo> = OnceLock::new();
 
 thread_local! {
     /// The thread-local QEMU hook state
