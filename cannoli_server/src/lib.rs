@@ -8,13 +8,15 @@
 mod cannoli_memops;
 mod cannoli_internals;
 
+use cannoli_internals::HookType;
+
 /// Called before an instruction is lifted in QEMU. If this function returns
 /// `true`, then the instrumentation is added and this PC will generate logs
 /// in the traces.
 ///
 /// This may be called from multiple threads
-fn hook_inst(_pc: u64) -> bool {
-    true
+fn hook_inst(_pc: u64) -> HookType {
+    HookType::Always
 }
 
 /// Called when a memory access is being lifted in QEMU. Returning `true` will
@@ -22,6 +24,6 @@ fn hook_inst(_pc: u64) -> bool {
 ///
 /// This may be called from multiple threads
 fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool {
-    true
+    false
 }
 

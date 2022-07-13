@@ -29,6 +29,29 @@ const NUM_BUFFERS: usize = 16;
 // Pull in the FFI bindings we generated
 include!(concat!(env!("OUT_DIR"), "/ffi_bindings.rs"));
 
+/// Different types of hooks
+#[allow(dead_code)]
+pub(super) enum HookType {
+    /// The callback for a given hook gets invoked only once for a given PC.
+    ///
+    /// This uses self-modifying code to disable the callback once it has been
+    /// hit once. It's possible due to race conditions or to QEMU re-JITting
+    /// the code that the callback fires again. This is effectively a massive
+    /// filter to prevent getting callbacks every single instruction, rather
+    /// you get them once per JIT of that code.
+    ///
+    /// Use this if you only care about things like binary coverage, and you
+    /// are not collecting a trace, you just want to know about the first event
+    /// for a given hook.
+    Once,
+
+    /// Hook fires every single time the instruction is hit
+    Always,
+
+    /// Don't hook at all
+    Never,
+}
+
 /// The per-thread storage for an active hook. This has to be per-thread
 /// storage because we have to conjure it out of thin air from globals, since
 /// we can't really transfer state inside of QEMU without grossness.
@@ -221,24 +244,45 @@ extern fn $init(arch: *const i8, big_endian: i32) -> &'static $cannoli {
 /// generated
 #[no_mangle]
 unsafe extern fn $lift(pc: $tusize, buf: *mut u8, buf_size: usize) -> usize {
-    // Do nothing if the hook doesn't want to hook this PC
-    if !crate::hook_inst(pc as u64) {
-        return 0;
-    }
+    // Get the requested hook type for this instruction
+    let hook_type = crate::hook_inst(pc as u64);
 
     // Get the start and end address of the shellcode
     //
     // Check the size of `$tusize` to determine the correct shellcode to use
-    let (start, end) = if size_of::<$tusize>() == size_of::<u32>() {
-        (
-            core::ptr::addr_of!(cannoli_insthook32)     as usize,
-            core::ptr::addr_of!(cannoli_insthook32_end) as usize,
-        )
-    } else {
-        (
-            core::ptr::addr_of!(cannoli_insthook64)     as usize,
-            core::ptr::addr_of!(cannoli_insthook64_end) as usize,
-        )
+    let (start, end) = match (<$tusize>::BITS, hook_type) {
+        (32, HookType::Always) => {
+            (
+                core::ptr::addr_of!(cannoli_insthook32)     as usize,
+                core::ptr::addr_of!(cannoli_insthook32_end) as usize,
+            )
+        }
+        (64, HookType::Always) => {
+            (
+                core::ptr::addr_of!(cannoli_insthook64)     as usize,
+                core::ptr::addr_of!(cannoli_insthook64_end) as usize,
+            )
+        }
+        (32, HookType::Once) => {
+            (
+                core::ptr::addr_of!(cannoli_insthook32_once)     as usize,
+                core::ptr::addr_of!(cannoli_insthook32_once_end) as usize,
+            )
+        }
+        (64, HookType::Once) => {
+            (
+                core::ptr::addr_of!(cannoli_insthook64_once)     as usize,
+                core::ptr::addr_of!(cannoli_insthook64_once_end) as usize,
+            )
+        }
+        (_, HookType::Never) => {
+            // Don't hook at all
+            return 0;
+        }
+        (_, _) => {
+            // At this point we've covered all the types we support
+            panic!("Invalid target bitness");
+        }
     };
 
     // Get a slice to the shellcode
@@ -523,10 +567,14 @@ unsafe extern fn $flush() {
 
 // Declare some symbols we defined in our global assembly below
 extern {
-    static cannoli_insthook32:     u8;
-    static cannoli_insthook32_end: u8;
-    static cannoli_insthook64:     u8;
-    static cannoli_insthook64_end: u8;
+    static cannoli_insthook32:          u8;
+    static cannoli_insthook32_end:      u8;
+    static cannoli_insthook64:          u8;
+    static cannoli_insthook64_end:      u8;
+    static cannoli_insthook32_once:     u8;
+    static cannoli_insthook32_once_end: u8;
+    static cannoli_insthook64_once:     u8;
+    static cannoli_insthook64_once_end: u8;
 }
 
 /// Magic value to replace with the address of the respective `flush_buffer`
@@ -549,15 +597,26 @@ std::arch::global_asm!(r#"
 //
 // bits  - The bitness of the emulated target, either 32 or 64
 // width - The bitness divided by eight (number of bytes per target usize)
-.macro create_insthook bits, width
+.macro create_insthook bits, width, once
 
 // This code is injected _directly_ into QEMUs JIT, we have to make sure we
 // don't touch _any_ registers without preserving them
-.global cannoli_insthook\bits
-cannoli_insthook\bits:
+.global cannoli_insthook\bits\()\once\()
+cannoli_insthook\bits\()\once\():
     // r12 - Pointer to trace buffer
     // r13 - Pointer to end of trace buffer
     // r14 - Scratch
+
+.ifnb \once
+    // Clear the zero flag
+    xor r14d, r14d
+
+    // Conditionally branch to the end of code
+    jnz 10f
+
+    // Replace branch above with a `jmp`
+    mov byte ptr [rip - 9], 0xeb
+.endif
 
     // Allocate room in the buffer
     lea r14, [r12 + \width + 1]
@@ -598,14 +657,19 @@ cannoli_insthook\bits:
     // Advance buffer
     add r12, \width + 1
 
-.global cannoli_insthook\bits\()_end
-cannoli_insthook\bits\()_end:
+    // End of hook
+10:
+
+.global cannoli_insthook\bits\()\once\()_end
+cannoli_insthook\bits\()\once\()_end:
 
 .endm // create_insthook
 
 // Create both the 32-bit and 64-bit instruction hooks
 create_insthook 32, 4
 create_insthook 64, 8
+create_insthook 32, 4, _once
+create_insthook 64, 8, _once
 
 // ============================================================================
 
