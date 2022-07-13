@@ -1,7 +1,7 @@
-From db2ba339ce8f84c0cf237b19e1d04cddf5a7b359 Mon Sep 17 00:00:00 2001
+From c507adad5106c08736a58484d97497a41af9203a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 1/9] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 01/10] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -348,10 +348,10 @@ index 0f9cfe96f2..739a4641c3 100644
 2.35.1
 
 
-From 03a6217a83477ea02d0fc09559839d36d4c24f91 Mon Sep 17 00:00:00 2001
+From b888d291601efb025f43f5aaf8fa927814faf926 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 2/9] Style cleanup, more comments
+Subject: [PATCH 02/10] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -893,10 +893,10 @@ index 739a4641c3..dde9cd89b3 100644
 2.35.1
 
 
-From c06dde5917c708249d956983fbf4338635760c39 Mon Sep 17 00:00:00 2001
+From b3f07497888cc629a23441a3e57b6d74904928ea Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 3/9] Added PC support to memops
+Subject: [PATCH 03/10] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1033,10 +1033,10 @@ index dde9cd89b3..590d997d65 100644
 2.35.1
 
 
-From a9c5d0bc612445620a03155e8653d7a071be2c5e Mon Sep 17 00:00:00 2001
+From 9f309973a5438a0b19f9a0cc7dd91b303302a89d Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 4/9] Updated path
+Subject: [PATCH 04/10] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1059,10 +1059,10 @@ index 20dc3c68a1..a71cd470f8 100644
 2.35.1
 
 
-From 65a74b09b31c70fbbb14bad0a4707d9ee2addd74 Mon Sep 17 00:00:00 2001
+From ca00ded55da9ca9d31f6402ebdcdd75cc62f1999 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 5/9] Added --with-cannoli build flag
+Subject: [PATCH 05/10] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1070,7 +1070,7 @@ Subject: [PATCH 5/9] Added --with-cannoli build flag
  2 files changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/configure b/configure
-index 76728b31f7..0287a4aba0 100755
+index e8cc850727..f830fdc52a 100755
 --- a/configure
 +++ b/configure
 @@ -313,6 +313,7 @@ plugins="$default_feature"
@@ -1098,7 +1098,7 @@ index 76728b31f7..0287a4aba0 100755
    --with-coroutine=BACKEND coroutine backend. Supported options:
                             ucontext, sigaltstack, windows
    --enable-plugins
-@@ -2379,6 +2383,11 @@ if [ "$bsd" = "yes" ] ; then
+@@ -2448,6 +2452,11 @@ if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
  fi
  
@@ -1138,10 +1138,10 @@ index a71cd470f8..657dfefc92 100644
 2.35.1
 
 
-From 6a05e5fc38509037e06bc290b112bf0614e78f90 Mon Sep 17 00:00:00 2001
+From 46cb276b273b495d9cb43ca3f78e506bd958034a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
-Subject: [PATCH 6/9] Fixed cannoli PC for memory operations
+Subject: [PATCH 06/10] Fixed cannoli PC for memory operations
 
 ---
  tcg/i386/tcg-target.c.inc | 21 ++++++-----------
@@ -1310,10 +1310,10 @@ index 590d997d65..d9d035576a 100644
 2.35.1
 
 
-From d18c3281c03bed3d5385f8dbff6cd6a4557b1397 Mon Sep 17 00:00:00 2001
+From ef3e8ad9311e95a44f8dfad94a57c60b6aa738be Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
-Subject: [PATCH 7/9] Wrap code in cannoli as needed
+Subject: [PATCH 07/10] Wrap code in cannoli as needed
 
 ---
  tcg/tcg.c | 4 ++++
@@ -1339,10 +1339,10 @@ index d9d035576a..8c508de957 100644
 2.35.1
 
 
-From d02ca53c09b9920200c170b72df54ad8d557eb7e Mon Sep 17 00:00:00 2001
+From dcd06ccc0327c7cd1430814c3425de522486ade7 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 06:05:07 -0700
-Subject: [PATCH 8/9] Fixed cannoli not flushing on longjmps and signals
+Subject: [PATCH 08/10] Fixed cannoli not flushing on longjmps and signals
 
 ---
  accel/tcg/cpu-exec-common.c | 16 ++++++++++++++++
@@ -1505,10 +1505,10 @@ index d0abc949a8..f54fb0f15f 100644
  
  /**
 diff --git a/target/arm/cpu.h b/target/arm/cpu.h
-index 4a4342f262..3df7aff7cd 100644
+index 1e36a839ee..832e5a7ec6 100644
 --- a/target/arm/cpu.h
 +++ b/target/arm/cpu.h
-@@ -766,6 +766,13 @@ typedef struct CPUArchState {
+@@ -767,6 +767,13 @@ typedef struct CPUArchState {
      /* Linux syscall tagged address support */
      bool tagged_addr_enable;
  #endif
@@ -1703,10 +1703,10 @@ index b9584f10d4..355084f27f 100644
  
  /**
 diff --git a/target/ppc/cpu.h b/target/ppc/cpu.h
-index 6d78078f37..e8def9140d 100644
+index 7aaff9dcc5..8cbe9dae4b 100644
 --- a/target/ppc/cpu.h
 +++ b/target/ppc/cpu.h
-@@ -1237,6 +1237,13 @@ struct CPUArchState {
+@@ -1249,6 +1249,13 @@ struct CPUArchState {
       * running cycles.
       */
      uint64_t pmu_base_time;
@@ -1893,10 +1893,10 @@ index 8c508de957..6d2de178e9 100644
 2.35.1
 
 
-From d72d8dc60167c510867696d623712843f4f39c19 Mon Sep 17 00:00:00 2001
+From 6ab0742e17fdb3d4be611adc50e3e0c0ad015175 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Tue, 31 May 2022 03:03:13 -0700
-Subject: [PATCH 9/9] Pass endian and arch information to cannoli
+Subject: [PATCH 09/10] Pass endian and arch information to cannoli
 
 ---
  linux-user/main.c | 5 +++--
@@ -1925,6 +1925,37 @@ index 06e7f0fbbc..472233097e 100644
  
      /* Check version */
      if(cannoli->version != CANNOLI_VERSION) {
+-- 
+2.35.1
+
+
+From 437ba23820e8a099c2c7b1fe0b5999dd838a8031 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Wed, 13 Jul 2022 13:58:58 -0700
+Subject: [PATCH 10/10] Added loongarch support
+
+---
+ target/loongarch/cpu.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/target/loongarch/cpu.h b/target/loongarch/cpu.h
+index d141ec9b5d..90521c26c9 100644
+--- a/target/loongarch/cpu.h
++++ b/target/loongarch/cpu.h
+@@ -310,6 +310,13 @@ typedef struct CPUArchState {
+     bool load_elf;
+     uint64_t elf_address;
+ #endif
++
++#ifdef CONFIG_CANNOLI
++    /* Storage for Cannoli's internal register state */
++    uint64_t cannoli_r12;
++    uint64_t cannoli_r13;
++    uint64_t cannoli_r14;
++#endif
+ } CPULoongArchState;
+ 
+ /**
 -- 
 2.35.1
 
