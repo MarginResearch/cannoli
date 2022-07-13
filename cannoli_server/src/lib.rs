@@ -24,6 +24,6 @@ fn hook_inst(_pc: u64) -> HookType {
 ///
 /// This may be called from multiple threads
 fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool {
-    false
+    true 
 }
 
