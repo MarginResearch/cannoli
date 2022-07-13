@@ -47,23 +47,21 @@ cargo build --release
 Checkout QEMU
 
 ```
-git clone https://github.com/qemu/QEMU
+git clone https://gitlab.com/qemu-project/qemu.git
 ```
 
 Apply patch from `qemu_patches.patch`
 
 ```
-cd QEMU
+cd qemu
 git am --3way </path/to/cannoli>/qemu_patches.patch
 ```
 
 Build QEMU for your desired targets (example mipsel and riscv64)
 
 ```
-mkdir build
-cd build
-../configure --target-list=mipsel-linux-user,riscv64-linux-user --extra-ldflags="-ldl" --with-cannoli=</path/to/cannoli>
-make
+./configure --target-list=mipsel-linux-user,riscv64-linux-user --extra-ldflags="-ldl" --with-cannoli=</path/to/cannoli>
+make -j48
 ```
 Try out the example symbolizer
 
