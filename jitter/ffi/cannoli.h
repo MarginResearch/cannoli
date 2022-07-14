@@ -71,6 +71,15 @@ struct Cannoli32 {
     /// - `buf_size` - Size of `buf` in bytes
     size_t (*lift_memop)(uint32_t pc, int32_t is_write, size_t data_reg,
         size_t addr_reg, int32_t memop, uint8_t *buf, size_t buf_size);
+
+    /// Invoked when the Linux application successfully has mmap()ed new
+    /// memory.
+    void (*mmap)(uint32_t start, uint32_t len, int is_anon, int is_read,
+            int is_write, int is_exec, char *path, uint32_t offset);
+    
+    /// Invoked when the Linux application invokes munmap() (even if
+    /// unsuccessful)
+    void (*munmap)(uint32_t start, uint32_t len);
 };
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
@@ -129,6 +138,15 @@ struct Cannoli64 {
     /// - `buf_size` - Size of `buf` in bytes
     size_t (*lift_memop)(uint64_t pc, int32_t is_write, size_t data_reg,
         size_t addr_reg, int32_t memop, uint8_t *buf, size_t buf_size);
+    
+    /// Invoked when the Linux application successfully has mmap()ed new
+    /// memory.
+    void (*mmap)(uint64_t start, uint64_t len, int is_anon, int is_read,
+            int is_write, int is_exec, char *path, uint64_t offset);
+
+    /// Invoked when the Linux application invokes munmap() (even if
+    /// unsuccessful)
+    void (*munmap)(uint64_t start, uint64_t len);
 };
 
 // If we're building in QEMU these will be defined and we'll make an alias for

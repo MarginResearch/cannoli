@@ -1,7 +1,7 @@
 CFLAGS = -O0 -g -static -fno-pic
 
 all: clean
-	mipsel-pc-linux-gnu-gcc -o example_app $(CFLAGS) example_app.c
+	mipsel-unknown-linux-musl-gcc -o example_app $(CFLAGS) example_app.c
 	riscv64-unknown-linux-musl-gcc -o example_app64 $(CFLAGS) example_app.c
 	nm example_app64 > symbols.txt
 	nm example_app >> symbols.txt

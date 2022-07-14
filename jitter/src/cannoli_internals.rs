@@ -13,6 +13,7 @@ compile_error!("This code literally has x86_64 assembly at its core, so uhh \
     x86_64 only right now :)");
 
 use std::io::Write;
+use std::ffi::CStr;
 use std::net::TcpStream;
 use std::mem::{ManuallyDrop, size_of};
 use std::cell::RefCell;
@@ -29,9 +30,13 @@ const NUM_BUFFERS: usize = 16;
 // Pull in the FFI bindings we generated
 include!(concat!(env!("OUT_DIR"), "/ffi_bindings.rs"));
 
+extern "Rust" {
+    fn hook_inst(_pc: u64) -> HookType;
+    fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool;
+}
+
 /// Different types of hooks
-#[allow(dead_code)]
-pub(super) enum HookType {
+pub enum HookType {
     /// The callback for a given hook gets invoked only once for a given PC.
     ///
     /// This uses self-modifying code to disable the callback once it has been
@@ -196,6 +201,8 @@ fn patch(buf: &mut [u8], magic: impl AsRef<[u8]>, new: impl AsRef<[u8]>) {
 /// - `$lift`    - Identifier for the per-instruction hook for this target
 /// - `$entry`   - Identifier for the JIT entry hook for this target
 /// - `$exit`    - Identifier for the JIT exit hook for this target
+/// - `$mmap`    - Identifier for the callback for mmap()s
+/// - `$munmap`  - Identifier for the callback for munmap()s
 /// - `$flush`   - Identifier for safe-to-call-from-JIT assembly which performs
 ///                a "fake" JIT exit and entry to flush the IPC data and get
 ///                a new buffer.
@@ -203,7 +210,7 @@ fn patch(buf: &mut [u8], magic: impl AsRef<[u8]>, new: impl AsRef<[u8]>) {
 macro_rules! create_bitness {
     (
         $tusize:ty, $cannoli:tt, $init:ident, $lift:ident, $entry:ident,
-        $exit:ident, $flush:ident, $memop:ident,
+        $exit:ident, $flush:ident, $memop:ident, $mmap:ident, $munmap:ident
     ) => {
 
 /// Called by QEMU to initialize this library, we also return version
@@ -217,6 +224,8 @@ extern fn $init(arch: *const i8, big_endian: i32) -> &'static $cannoli {
         lift_memop:       Some($memop),
         jit_entry:        Some($entry),
         jit_exit:         Some($exit),
+        mmap:             Some($mmap),
+        munmap:           Some($munmap),
     };
 
     // Convert architecture string to enum
@@ -245,7 +254,7 @@ extern fn $init(arch: *const i8, big_endian: i32) -> &'static $cannoli {
 #[no_mangle]
 unsafe extern fn $lift(pc: $tusize, buf: *mut u8, buf_size: usize) -> usize {
     // Get the requested hook type for this instruction
-    let hook_type = crate::hook_inst(pc as u64);
+    let hook_type = hook_inst(pc as u64);
 
     // Get the start and end address of the shellcode
     //
@@ -436,7 +445,7 @@ unsafe extern fn $memop(pc: $tusize, is_write: i32, data_reg: usize,
 
     // Do nothing if the hook doesn't want to hook this operation
     let memsize = [1, 2, 4, 8];
-    if !crate::hook_mem(pc as u64, is_write != 0, memsize[memop as usize]) {
+    if !hook_mem(pc as u64, is_write != 0, memsize[memop as usize]) {
         return 0;
     }
 
@@ -561,6 +570,79 @@ unsafe extern fn $flush() {
         ret
     "#, entry = sym $entry, exit = sym $exit, options(noreturn));
 }
+
+/// Called on successful mappings
+#[no_mangle]
+unsafe extern fn $mmap(start: $tusize, len: $tusize,
+        anon: i32, read: i32, write: i32, exec: i32, path: *mut i8,
+        offset: $tusize) {
+    HOOK_STATE.with(|hook| {
+        // Get mutable access to the hook state
+        let mut hook = hook.borrow_mut();
+
+        // Shouldn't have an active buffer
+        assert!(hook.active_buffer.is_none(), "mmap from inside the JIT?");
+
+        // Allocate a new buffer in our pipe
+        let buffer = hook.pipe.alloc_buffer();
+
+        // Convert the path into bytes
+        let path: &[u8] = if path.is_null() {
+            &[]
+        } else {
+            CStr::from_ptr(path).to_bytes()
+        };
+
+        // Temporary vector for building packet
+        let mut tmp = Vec::new();
+
+        // Opcode
+        tmp.push(if <$tusize>::BITS == 64 { 0xb0 } else { 0x30 });
+
+        // Parameters
+        tmp.extend_from_slice(&start.to_le_bytes());
+        tmp.extend_from_slice(&len.to_le_bytes());
+        tmp.push(anon  as u8);
+        tmp.push(read  as u8);
+        tmp.push(write as u8);
+        tmp.push(exec  as u8);
+        tmp.extend_from_slice(&(path.len() as u32).to_le_bytes());
+        tmp.extend_from_slice(&offset.to_le_bytes());
+        tmp.extend_from_slice(path);
+
+        // Send the payload
+        buffer.send(tmp);
+    });
+}
+
+/// Called on successful mappings
+#[no_mangle]
+unsafe extern fn $munmap(start: $tusize, len: $tusize) {
+    HOOK_STATE.with(|hook| {
+        // Get mutable access to the hook state
+        let mut hook = hook.borrow_mut();
+
+        // Shouldn't have an active buffer
+        assert!(hook.active_buffer.is_none(), "munmap from inside the JIT?");
+
+        // Allocate a new buffer in our pipe
+        let buffer = hook.pipe.alloc_buffer();
+
+        // Temporary vector for building packet
+        let mut tmp = Vec::new();
+
+        // Opcode
+        tmp.push(if <$tusize>::BITS == 64 { 0xb1 } else { 0x31 });
+
+        // Parameters
+        tmp.extend_from_slice(&start.to_le_bytes());
+        tmp.extend_from_slice(&len.to_le_bytes());
+
+        // Send the payload
+        buffer.send(tmp);
+    });
+}
+
 }} // macro_rules!
 
 // ============================================================================
@@ -812,11 +894,13 @@ multiple_create_memhook64 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10
 create_bitness!(
     u32, Cannoli32, init_cannoli32, lift_instruction32, jit_entry32,
     jit_exit32, cannoli_flush_buffer32, lift_memop32,
+    cannoli_mmap32, cannoli_munmap32
 );
 
 // Create the 64-bit Cannoli implementation
 create_bitness!(
     u64, Cannoli64, init_cannoli64, lift_instruction64, jit_entry64,
     jit_exit64, cannoli_flush_buffer64, lift_memop64,
+    cannoli_mmap64, cannoli_munmap64
 );
 

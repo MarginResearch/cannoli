@@ -38,6 +38,9 @@ pub enum Error {
 
     /// An invalid opcode was encountered in the data stream
     InvalidOpcode(u8),
+
+    /// Getting the path for mmap() did not contain valid UTF-8 characters
+    PathEncoding(std::str::Utf8Error),
 }
 
 /// Chunk size to use when streaming data over IPC
@@ -255,6 +258,39 @@ fn parse_payload<T: Cannoli>(user: &T::Context, trace: &mut Vec<T::Trace>,
             },
             0x80 => { // Exec64
                 T::exec(user, consume!(payload, u64).0)
+            },
+
+            0x30 => { // Mmap32
+                let (addr, len, anon, read, write, exec, path_len, offset) =
+                    consume!(payload, u32, u32, u8, u8, u8, u8, u32, u32);
+                let path = core::str::from_utf8(
+                    payload.get(..path_len as usize)
+                    .ok_or(Error::BufferTruncated)?)
+                    .map_err(Error::PathEncoding)?;
+                payload = &payload[path_len as usize..];
+
+                T::mmap(user, addr as u64, len as u64, anon != 0, read != 0,
+                    write != 0, exec != 0, path, offset as u64)
+            },
+            0x31 => { // Munmap32
+                let (addr, len) = consume!(payload, u32, u32);
+                T::munmap(user, addr as u64, len as u64)
+            },
+            0xb0 => { // Mmap64
+                let (addr, len, anon, read, write, exec, path_len, offset) =
+                    consume!(payload, u64, u64, u8, u8, u8, u8, u32, u64);
+                let path = core::str::from_utf8(
+                    payload.get(..path_len as usize)
+                    .ok_or(Error::BufferTruncated)?)
+                    .map_err(Error::PathEncoding)?;
+                payload = &payload[path_len as usize..];
+
+                T::mmap(user, addr, len, anon != 0, read != 0,
+                    write != 0, exec != 0, path, offset)
+            },
+            0xb1 => { // Munmap64
+                let (addr, len) = consume!(payload, u64, u64);
+                T::munmap(user, addr, len)
             },
 
             0x11 => { // Read8_32
@@ -503,7 +539,7 @@ fn handle_client<T: Cannoli + 'static>(
                                 let trace = state.traces.remove(0).1;
 
                                 // Report the trace
-                                state.user.trace(user_ctxt, &trace);
+                                state.user.trace(user_ctxt, trace);
                             }
 
                             // Get a new trace buffer since we moved ours into
@@ -591,13 +627,9 @@ pub fn create_cannoli<T: Cannoli + 'static>(threads: usize) -> Result<()> {
                         .ok().map(|x| x.to_string()),
                 };
 
-                println!("New client {:#?}", ci);
-
                 // Handle the client
                 handle_client::<T>(stream, threads, &ci)
                     .expect("Failed to handle client");
-
-                println!("Lost client {:#?}", ci);
             });
         }
 
@@ -682,6 +714,16 @@ pub trait Cannoli: Send + Sync {
     ///
     /// Executed serially. Maybe in different threads, but only one at a time
     /// (hence, mutable access to self)
-    fn trace(&mut self, _ctxt: &Self::Context, _trace: &[Self::Trace]) {}
+    fn trace(&mut self, _ctxt: &Self::Context, _trace: Vec<Self::Trace>) {}
+
+    /// Invoked after a _successful_ mmap() in the target application, provides
+    /// the base address, length, anon state, read, write, and exec flags
+    fn mmap(_ctxt: &Self::Context, _base: u64, _len: u64, _anon: bool,
+        _read: bool, _write: bool, _exec: bool, _path: &str, _offset: u64)
+            -> Option<Self::Trace> { None }
+    
+    /// Invoked when the guest is attempting to `munmap()` memory
+    fn munmap(_ctxt: &Self::Context, _base: u64, _len: u64)
+        -> Option<Self::Trace> { None }
 }
 

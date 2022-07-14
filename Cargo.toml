@@ -4,13 +4,15 @@ resolver = "2"
 members = [
     "mempipe",
     "cannoli",
-    "cannoli_server",
+    "jitter",
+    "jitter_always",
     "examples/visualization",
     "examples/symbolizer",
     "examples/benchmark",
     "examples/benchmark_graph",
+    "examples/coverage",
 ]
 default-members = [
-    "cannoli_server",
+    "jitter_always",
 ]
 

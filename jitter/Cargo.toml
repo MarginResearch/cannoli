@@ -1,5 +1,5 @@
 [package]
-name = "cannoli_server"
+name = "jitter"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,7 +12,4 @@ libc = "*"
 
 [build-dependencies]
 bindgen = "*"
-
-[lib]
-crate-type = ["cdylib"]
 

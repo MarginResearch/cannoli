@@ -1,4 +1,4 @@
-![Cannoli Mascot!](/logo.png)
+![Cannoli Mascot!](/.assets/logo.png)
 
 ## Cannoli
 
@@ -21,7 +21,7 @@ the data from a single QEMU thread to parallelize processing of traces.
 
 ## Is it fast?
 
-![Graph showing 2.2 billion instructions/sec](/perf_graph.png)
+![Graph showing 2.2 billion instructions/sec](/.assets/perf_graph.png)
 
 <sub>Performance with a single QEMU thread running the benchmark example on a
 Intel Xeon Silver 4310 @ 2.1 GHz, target is mipsel-linux, hot loop of
@@ -32,7 +32,7 @@ unrolled nops to benchmark PC tracing bandwidth (worst case for us)</sub>
 For an example, check out the symbolizer! Here's the kind of information you
 can get!
 
-![Example symbolizer showing memory accesses and PC executions](/example_symbol.png)
+![Example symbolizer showing memory accesses and PC executions](/.assets/example_symbol.png)
 
 ## TL;DR Getting it running
 
@@ -77,19 +77,20 @@ In another terminal, run the program in QEMU with Cannoli!
 
 ```
 cd examples/symbolizer
-</path/to/qemu>/build/qemu-mipsel -cannoli </path/to/cannoli>/target/release/libcannoli_server.so ./example_app
+</path/to/qemu>/build/qemu-mipsel -cannoli </path/to/cannoli>/target/release/<your jitter so>.so ./example_app
 ```
 
 ## What to do
 
 1. Create an application using the `cannoli` library to process traces by
    implementing the `Cannoli` trait (see one of the `examples`)
-2. Optionally modify `cannoli_server/src/lib.rs` as needed to reduce the number
-   of hooks installed into the JIT (improves performance)
-3. Build Cannoli
-4. Run your trace-parsing application
-5. Launch QEMU with the `-cannoli` argument, and a path to the compiled
-   `libcannoli_server.so` that you built!
+2. Create a library using the `jitter` library to filter JIT hooks by
+   implementing `hook_inst` and `hook_mem`, this must be a `cdylib` that
+   produces the `.so` that you pass into QEMU with `--cannoli`. For a basic
+   example of this that hooks everything, see `jitter_always`
+3. Run your trace-parsing application
+4. Launch QEMU with the `-cannoli` argument, and a path to the compiled
+   `<jitter>.so` that you built!
 
 ## User-experience
 
@@ -110,26 +111,34 @@ To apply the patches, simply run something like:
 
 `git am qemu_patches.patch`
 
-### Cannoli "server"
+### Jitter
 
-The shared library which is loaded into QEMU is called the Cannoli server.
+The shared library which is loaded into QEMU is called the Cannoli Jitter.
 
-This library exposes two basic callbacks in `cannoli_server/src/lib.rs`.
+Using this library expects two basic callbacks to be implemented, such that
+QEMU knows when to hook, and how to hook, certain operations. This is the
+filter mechanism that prevents JIT code from being produced in the first place
+if you do not want to hook literally everything.
 
 ```rust
-/// Called before an instruction is lifted in QEMU. If this function returns
-/// `true`, then the instrumentation is added and this PC will generate logs
-/// in the traces.
+use jitter::HookType;
+
+/// Called before an instruction is lifted in QEMU.
+///
+/// The `HookType` dictates the type of hook used for the instruction, and may
+/// be `Never`, `Always`, and `Once`
 ///
 /// This may be called from multiple threads
-fn hook_inst(_pc: u64) -> bool {
-    true
+#[no_mangle]
+fn hook_inst(_pc: u64) -> HookType {
+    HookType::Always
 }
 
 /// Called when a memory access is being lifted in QEMU. Returning `true` will
 /// cause the memory access to generate events in the trace buffer.
 ///
 /// This may be called from multiple threads
+#[no_mangle]
 fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool {
     true
 }

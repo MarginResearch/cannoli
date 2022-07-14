@@ -1,4 +1,4 @@
 all:
-	mipsel-pc-linux-gnu-gcc -static -O2 -g -nostdlib test.c -o benchmark
-	riscv64-unknown-linux-musl-gcc -static -O2 -g -nostdlib test.c -o benchmarkrv64
+	mipsel-unknown-linux-musl-gcc -static -O0 -g test.c -o benchmark
+	riscv64-unknown-linux-musl-gcc -static -O0 -g test.c -o benchmarkrv64
 
