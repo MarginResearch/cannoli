@@ -59,7 +59,7 @@ impl Cannoli for Benchmark {
         Some(())
     }
 
-    fn trace(&mut self, _ctxt: &Self::Context, trace: &[Self::Trace]) {
+    fn trace(&mut self, _ctxt: &Self::Context, trace: Vec<Self::Trace>) {
         // Track number of instructions in the trace
         self.instructions += trace.len() as u64;
     }

@@ -138,7 +138,7 @@ impl Cannoli for Symbolizer {
     }
 
     /// Print the trace we processed!
-    fn trace(&mut self, _ctxt: &Self::Context, trace: &[Self::Trace]) {
+    fn trace(&mut self, _ctxt: &Self::Context, trace: Vec<Self::Trace>) {
         for op in trace {
             match op {
                 Operation::Exec { pc } => {

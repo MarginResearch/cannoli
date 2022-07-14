@@ -72,13 +72,13 @@ impl Cannoli for Tracer {
         Some(Trace::Store(addr as u32))
     }
 
-    fn trace(&mut self, _ctxt: &Self::Context, trace: &[Self::Trace]) {
+    fn trace(&mut self, _ctxt: &Self::Context, trace: Vec<Self::Trace>) {
         let mut loads  = 0;
         let mut stores = 0;
         let mut instrs = 0;
 
         for event in trace {
-            match *event {
+            match event {
                 Trace::Load(addr) => {
                     self.set_pixel(addr as u32, (0x00, 0xff, 0x00));
                     loads += 1;
