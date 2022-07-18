@@ -16,8 +16,9 @@ use std::io::Write;
 use std::ffi::CStr;
 use std::net::TcpStream;
 use std::mem::{ManuallyDrop, size_of};
-use std::cell::RefCell;
+use std::cell::{RefCell, UnsafeCell, RefMut};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicI32, Ordering};
 use cannoli::{Architecture, ClientConn};
 use mempipe::{SendPipe, ChunkWriter};
 
@@ -157,7 +158,16 @@ static QEMU_INFO: OnceLock<QemuInfo> = OnceLock::new();
 
 thread_local! {
     /// The thread-local QEMU hook state
-    static HOOK_STATE: RefCell<HookState> = RefCell::new(HookState::default());
+    ///
+    /// The `AtomicI32` holds the thread ID of the thread that owns the thread
+    /// locals. This sounds silly since they're uhh... thread locals, but when
+    /// a fork() occurs with `CLONE_VM`, and no new TLS is set up, then this
+    /// value will be _reused_ from a previously initialized state. We want to
+    /// detect when we may have forked and need to re-initialize the hook state
+    static HOOK_STATE: (AtomicI32, UnsafeCell<RefCell<HookState>>) = (
+        AtomicI32::new(unsafe { libc::gettid() }),
+        UnsafeCell::new(RefCell::new(HookState::default()))
+    );
 }
 
 /// Patch a buffer by searching for `magic` and replacing it with `new`
@@ -179,6 +189,27 @@ fn patch(buf: &mut [u8], magic: impl AsRef<[u8]>, new: impl AsRef<[u8]>) {
 
     // Perform the patch
     buf[patch..][..new.len()].copy_from_slice(new);
+}
+
+/// We might have to re-create the thread locals as sometimes the TLS is not
+/// re-initialized on `fork()` (however it is on `pthread_create()`)
+fn with_hook<F: FnOnce(RefMut<'_, HookState>)>(callback: F) {
+    HOOK_STATE.with(|hook| {
+        // Check if the hook state changed threads (fork() without setting a
+        // new TLS)
+        if hook.0.load(Ordering::Acquire) != unsafe { libc::gettid() } {
+            // Re-initialize the hook-state
+            unsafe {
+                hook.1.get().write(RefCell::new(HookState::default()));
+            }
+
+            // Update the thread ID
+            hook.0.store(unsafe { libc::gettid() }, Ordering::Release);
+        }
+
+        // Okay, now we have an exclusive thread state, invoke the callback
+        callback(unsafe { (*hook.1.get()).borrow_mut() });
+    });
 }
 
 // ============================================================================
@@ -329,11 +360,8 @@ unsafe extern fn $lift(pc: $tusize, buf: *mut u8, buf_size: usize) -> usize {
 /// the values for `r12`, `r13`, and `r14`, respectively
 #[no_mangle]
 unsafe extern fn $entry(out_regs: *mut usize) {
-    // Invoke Rust-level JIT entry hook
-    HOOK_STATE.with(|hook| {
-        // Get mutable access to the hook state
-        let mut hook = hook.borrow_mut();
-
+    // Make sure the hook state is thread-local
+    with_hook(|mut hook| {
         // Make sure we didn't do a double entry. This is to catch places where
         // we might exit the JIT without calling JIT exit, indicating where we
         // need more QEMU hooks
@@ -371,11 +399,7 @@ unsafe extern fn $entry(out_regs: *mut usize) {
 /// opportunity to observe the changes to the registers
 #[no_mangle]
 unsafe extern fn $exit(r12: usize, _r13: usize, _r14: usize) {
-    // Invoke Rust-level JIT exit hook
-    HOOK_STATE.with(|hook| {
-        // Get mutable access to the hook state
-        let mut hook = hook.borrow_mut();
-
+    with_hook(|mut hook| {
         // QEMU is duct-taped together with longjmps and these can happen
         // inside the JIT. We're trying to carefully hook everything that can
         // possibly exit the JIT, and sometimes we get it wrong :(
@@ -576,10 +600,8 @@ unsafe extern fn $flush() {
 unsafe extern fn $mmap(start: $tusize, len: $tusize,
         anon: i32, read: i32, write: i32, exec: i32, path: *mut i8,
         offset: $tusize) {
-    HOOK_STATE.with(|hook| {
-        // Get mutable access to the hook state
-        let mut hook = hook.borrow_mut();
-
+    // Make sure the hook state is thread-local
+    with_hook(|mut hook| {
         // Shouldn't have an active buffer
         assert!(hook.active_buffer.is_none(), "mmap from inside the JIT?");
 
@@ -618,10 +640,8 @@ unsafe extern fn $mmap(start: $tusize, len: $tusize,
 /// Called on successful mappings
 #[no_mangle]
 unsafe extern fn $munmap(start: $tusize, len: $tusize) {
-    HOOK_STATE.with(|hook| {
-        // Get mutable access to the hook state
-        let mut hook = hook.borrow_mut();
-
+    // Make sure the hook state is thread-local
+    with_hook(|mut hook| {
         // Shouldn't have an active buffer
         assert!(hook.active_buffer.is_none(), "munmap from inside the JIT?");
 

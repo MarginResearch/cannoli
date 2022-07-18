@@ -80,6 +80,32 @@ cd examples/symbolizer
 </path/to/qemu>/build/qemu-mipsel -cannoli </path/to/cannoli>/target/release/<your jitter so>.so ./example_app
 ```
 
+## Coverage Example
+
+Cannoli can be used to get coverage of binary applications for pretty cheap.
+There's an example provided that uses terrible symbol resolution, but it gives
+you a rough idea of what you can do
+
+Build and run the client:
+
+```
+cd cannoli/examples/coverage
+cargo run --release
+```
+
+Invoke QEMU on a binary you want coverage of, using the coverage hooks
+
+```
+QEMU_CANNOLI=cannoli/target/release/libcoverage.so qemu/build/qemu-x86_64 /usr/bin/vlc
+```
+
+This should work even for large, many-threaded applications! The coverage is
+self-silencing, meaning it will disable reporting of coverage (in the JIT) by
+patching itself out once it executes for the first time. You might get events
+in the future for the same callbacks due to re-JITting of the same code, but
+it's just meant to be a major filter to cut down on the traffic that you would
+otherwise get will full tracing.
+
 ## What to do
 
 1. Create an application using the `cannoli` library to process traces by
