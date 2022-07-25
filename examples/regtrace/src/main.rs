@@ -1,5 +1,7 @@
 //! An example user of Cannoli which collects register traces
 
+#![feature(array_chunks)]
+
 use cannoli::{Cannoli, create_cannoli};
 
 /// The structure we implement [`Cannoli`] for!
@@ -22,9 +24,12 @@ impl Cannoli for Coverage {
     }
 
     fn regs(_ctxt: &Context, pc: u64, regs: &[u8]) -> Option<()> {
-        let regs = regs.array_chunks::<4>().map(|x| u32::from_le_bytes(x));
+        let mut parsed = [0; 32];
+        for (ii, chunk) in regs.array_chunks::<4>().enumerate() {
+            parsed[ii] = u32::from_le_bytes(*chunk);
+        }
 
-        println!("Regs {:#x} {}", pc, regs.len());
+        println!("Regs {pc:#x} {parsed:#x?}");
         None
     }
 }

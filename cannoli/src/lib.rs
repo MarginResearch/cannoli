@@ -700,7 +700,7 @@ pub trait Cannoli: Send + Sync {
     /// are processing traces, the order of the events are not stable. This
     /// function is only meant to reason about `pc` in isolation, not with
     /// respect to previous operations.
-    fn regs(_ctxt: &Self::Context, _pc: u64, regs: &[u8])
+    fn regs(_ctxt: &Self::Context, _pc: u64, _regs: &[u8])
         -> Option<Self::Trace> { None }
 
     /// Invoked when a memory load was lifted from the trace with a given
