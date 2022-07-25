@@ -22,6 +22,8 @@ impl Cannoli for Coverage {
     }
 
     fn regs(_ctxt: &Context, pc: u64, regs: &[u8]) -> Option<()> {
+        let regs = regs.array_chunks::<4>().map(|x| u32::from_le_bytes(x));
+
         println!("Regs {:#x} {}", pc, regs.len());
         None
     }
