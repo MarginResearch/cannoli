@@ -1,4 +1,4 @@
-From c507adad5106c08736a58484d97497a41af9203a Mon Sep 17 00:00:00 2001
+From 0d22343a3deeccc7dad027433fb5b01eec003347 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
 Subject: [PATCH 01/11] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
@@ -348,7 +348,7 @@ index 0f9cfe96f2..739a4641c3 100644
 2.35.1
 
 
-From b888d291601efb025f43f5aaf8fa927814faf926 Mon Sep 17 00:00:00 2001
+From 55fb223facc8314fbb3fcce04f2a2523f9206187 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
 Subject: [PATCH 02/11] Style cleanup, more comments
@@ -893,7 +893,7 @@ index 739a4641c3..dde9cd89b3 100644
 2.35.1
 
 
-From b3f07497888cc629a23441a3e57b6d74904928ea Mon Sep 17 00:00:00 2001
+From 167924c0a100e17bd60ab6efd1ef56e89cfc6c80 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
 Subject: [PATCH 03/11] Added PC support to memops
@@ -1033,7 +1033,7 @@ index dde9cd89b3..590d997d65 100644
 2.35.1
 
 
-From 9f309973a5438a0b19f9a0cc7dd91b303302a89d Mon Sep 17 00:00:00 2001
+From c579ec5f9f962778c36460a6a418f1c849fe80c8 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
 Subject: [PATCH 04/11] Updated path
@@ -1059,7 +1059,7 @@ index 20dc3c68a1..a71cd470f8 100644
 2.35.1
 
 
-From ca00ded55da9ca9d31f6402ebdcdd75cc62f1999 Mon Sep 17 00:00:00 2001
+From 692ab530af756a465874d9c28d07aaed506fb277 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
 Subject: [PATCH 05/11] Added --with-cannoli build flag
@@ -1070,7 +1070,7 @@ Subject: [PATCH 05/11] Added --with-cannoli build flag
  2 files changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/configure b/configure
-index e8cc850727..f830fdc52a 100755
+index 35e0b28198..225ab9622c 100755
 --- a/configure
 +++ b/configure
 @@ -313,6 +313,7 @@ plugins="$default_feature"
@@ -1081,7 +1081,7 @@ index e8cc850727..f830fdc52a 100755
  bindir="bin"
  skip_meson=no
  vfio_user_server="disabled"
-@@ -875,6 +876,8 @@ for opt do
+@@ -890,6 +891,8 @@ for opt do
    ;;
    --with-coroutine=*) coroutine="$optarg"
    ;;
@@ -1090,7 +1090,7 @@ index e8cc850727..f830fdc52a 100755
    --disable-zlib-test)
    ;;
    --disable-virtio-blk-data-plane|--enable-virtio-blk-data-plane)
-@@ -1052,6 +1055,7 @@ Advanced options (experts only):
+@@ -1067,6 +1070,7 @@ Advanced options (experts only):
    --disable-werror         disable compilation abort on warning
    --disable-stack-protector disable compiler-provided stack protection
    --cpu=CPU                Build for host CPU [$cpu]
@@ -1098,7 +1098,7 @@ index e8cc850727..f830fdc52a 100755
    --with-coroutine=BACKEND coroutine backend. Supported options:
                             ucontext, sigaltstack, windows
    --enable-plugins
-@@ -2448,6 +2452,11 @@ if [ "$bsd" = "yes" ] ; then
+@@ -2476,6 +2480,11 @@ if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
  fi
  
@@ -1138,7 +1138,7 @@ index a71cd470f8..657dfefc92 100644
 2.35.1
 
 
-From 46cb276b273b495d9cb43ca3f78e506bd958034a Mon Sep 17 00:00:00 2001
+From bc3b30de68e01b228ed5037f2d9eeb5a06e06d24 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
 Subject: [PATCH 06/11] Fixed cannoli PC for memory operations
@@ -1310,7 +1310,7 @@ index 590d997d65..d9d035576a 100644
 2.35.1
 
 
-From ef3e8ad9311e95a44f8dfad94a57c60b6aa738be Mon Sep 17 00:00:00 2001
+From 417865368fdd4727aae16c5a4315ca27cc23cd54 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
 Subject: [PATCH 07/11] Wrap code in cannoli as needed
@@ -1339,7 +1339,7 @@ index d9d035576a..8c508de957 100644
 2.35.1
 
 
-From dcd06ccc0327c7cd1430814c3425de522486ade7 Mon Sep 17 00:00:00 2001
+From 294a609f17f5922f04f94902487ad5f4e5822674 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 06:05:07 -0700
 Subject: [PATCH 08/11] Fixed cannoli not flushing on longjmps and signals
@@ -1505,10 +1505,10 @@ index d0abc949a8..f54fb0f15f 100644
  
  /**
 diff --git a/target/arm/cpu.h b/target/arm/cpu.h
-index 1e36a839ee..832e5a7ec6 100644
+index e890ee074d..515b6ff4d5 100644
 --- a/target/arm/cpu.h
 +++ b/target/arm/cpu.h
-@@ -767,6 +767,13 @@ typedef struct CPUArchState {
+@@ -761,6 +761,13 @@ typedef struct CPUArchState {
      /* Linux syscall tagged address support */
      bool tagged_addr_enable;
  #endif
@@ -1703,10 +1703,10 @@ index b9584f10d4..355084f27f 100644
  
  /**
 diff --git a/target/ppc/cpu.h b/target/ppc/cpu.h
-index 7aaff9dcc5..8cbe9dae4b 100644
+index a4c893cfad..48b84165c5 100644
 --- a/target/ppc/cpu.h
 +++ b/target/ppc/cpu.h
-@@ -1249,6 +1249,13 @@ struct CPUArchState {
+@@ -1248,6 +1248,13 @@ struct CPUArchState {
       * running cycles.
       */
      uint64_t pmu_base_time;
@@ -1893,7 +1893,7 @@ index 8c508de957..6d2de178e9 100644
 2.35.1
 
 
-From 6ab0742e17fdb3d4be611adc50e3e0c0ad015175 Mon Sep 17 00:00:00 2001
+From d808d106265f45ad1e851d7685b190ef5f28295a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Tue, 31 May 2022 03:03:13 -0700
 Subject: [PATCH 09/11] Pass endian and arch information to cannoli
@@ -1929,7 +1929,7 @@ index 06e7f0fbbc..472233097e 100644
 2.35.1
 
 
-From 437ba23820e8a099c2c7b1fe0b5999dd838a8031 Mon Sep 17 00:00:00 2001
+From 7fcd37a758edc29d4884d1887b120d5bcc8298d7 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 13 Jul 2022 13:58:58 -0700
 Subject: [PATCH 10/11] Added loongarch support
@@ -1939,7 +1939,7 @@ Subject: [PATCH 10/11] Added loongarch support
  1 file changed, 7 insertions(+)
 
 diff --git a/target/loongarch/cpu.h b/target/loongarch/cpu.h
-index d141ec9b5d..90521c26c9 100644
+index a36349df83..c01017ed97 100644
 --- a/target/loongarch/cpu.h
 +++ b/target/loongarch/cpu.h
 @@ -310,6 +310,13 @@ typedef struct CPUArchState {
@@ -1960,7 +1960,7 @@ index d141ec9b5d..90521c26c9 100644
 2.35.1
 
 
-From 23e3a401bf2471fe2a0b1a950f10391165b54b7b Mon Sep 17 00:00:00 2001
+From 9af94b2ec3a6b7d407ee5714cb00f297becd60d8 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 13 Jul 2022 19:03:29 -0700
 Subject: [PATCH 11/11] Added mmap hooks

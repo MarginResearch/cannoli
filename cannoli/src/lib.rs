@@ -260,6 +260,21 @@ fn parse_payload<T: Cannoli>(user: &T::Context, trace: &mut Vec<T::Trace>,
                 T::exec(user, consume!(payload, u64).0)
             },
 
+            0x01 => { // Regs32
+                let size = consume!(payload, u32).0;
+                let pc   = consume!(payload, u32).0 as u64;
+                let regs = &payload[..size as usize];
+                payload = &payload[size as usize..];
+                T::regs(user, pc, regs)
+            },
+            0x81 => { // Regs64
+                let size = consume!(payload, u32).0;
+                let pc   = consume!(payload, u64).0;
+                let regs = &payload[..size as usize];
+                payload = &payload[size as usize..];
+                T::regs(user, pc, regs)
+            },
+
             0x30 => { // Mmap32
                 let (addr, len, anon, read, write, exec, path_len, offset) =
                     consume!(payload, u32, u32, u8, u8, u8, u8, u32, u32);
@@ -670,6 +685,24 @@ pub trait Cannoli: Send + Sync {
     /// respect to previous operations.
     fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace> { None }
 
+    /// Invoked when execution of an instruction with register tracing occurs
+    ///
+    /// Executed on multiple threads
+    ///
+    /// This is a high-performance parallel callback, and is a prime location
+    /// for adding code if you need to do processing unrelated to the flow of
+    /// a trace itself. For example, symbolizing a trace makes the most sense
+    /// here as it doesn't care about the instructions around it. Think of this
+    /// like a `filter_map` where it applies a transformation in parallel,
+    /// and potentially removing information from the trace
+    ///
+    /// Part of the parallel phase of trace processing. Since multiple threads
+    /// are processing traces, the order of the events are not stable. This
+    /// function is only meant to reason about `pc` in isolation, not with
+    /// respect to previous operations.
+    fn regs(_ctxt: &Self::Context, _pc: u64, regs: &[u8])
+        -> Option<Self::Trace> { None }
+
     /// Invoked when a memory load was lifted from the trace with a given
     /// access size in bytes
     ///
@@ -721,7 +754,7 @@ pub trait Cannoli: Send + Sync {
     fn mmap(_ctxt: &Self::Context, _base: u64, _len: u64, _anon: bool,
         _read: bool, _write: bool, _exec: bool, _path: &str, _offset: u64)
             -> Option<Self::Trace> { None }
-    
+
     /// Invoked when the guest is attempting to `munmap()` memory
     fn munmap(_ctxt: &Self::Context, _base: u64, _len: u64)
         -> Option<Self::Trace> { None }

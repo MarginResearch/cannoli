@@ -11,6 +11,7 @@ members = [
     "examples/benchmark",
     "examples/benchmark_graph",
     "examples/coverage",
+    "examples/regtrace",
 ]
 default-members = [
     "jitter_always",

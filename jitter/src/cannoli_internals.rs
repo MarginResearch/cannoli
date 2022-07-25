@@ -18,7 +18,7 @@ use std::net::TcpStream;
 use std::mem::{ManuallyDrop, size_of};
 use std::cell::{RefCell, UnsafeCell, RefMut};
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use cannoli::{Architecture, ClientConn};
 use mempipe::{SendPipe, ChunkWriter};
 
@@ -37,6 +37,7 @@ extern "Rust" {
 }
 
 /// Different types of hooks
+#[derive(Clone, Copy)]
 pub enum HookType {
     /// The callback for a given hook gets invoked only once for a given PC.
     ///
@@ -53,6 +54,10 @@ pub enum HookType {
 
     /// Hook fires every single time the instruction is hit
     Always,
+
+    /// Hook fires every time an instruction is hit, and reports PC and the
+    /// GPR state for the target architecture
+    Register,
 
     /// Don't hook at all
     Never,
@@ -172,8 +177,7 @@ thread_local! {
 
 /// Patch a buffer by searching for `magic` and replacing it with `new`
 ///
-/// Only patches the first instance of `magic`, panics if no instances of
-/// `magic` were found
+/// Panics if no instances of `magic` are found
 fn patch(buf: &mut [u8], magic: impl AsRef<[u8]>, new: impl AsRef<[u8]>) {
     // Get the slice versions of the arguments
     let magic = magic.as_ref();
@@ -184,11 +188,18 @@ fn patch(buf: &mut [u8], magic: impl AsRef<[u8]>, new: impl AsRef<[u8]>) {
         "Cannoli: Invalid arguments passed to patch()");
 
     // Find the patch location
-    let patch = buf.windows(magic.len()).position(|x| x == magic)
-        .expect("Cannoli: Failed to find patch location");
+    let mut patched = false;
+    for ii in 0..buf.len() - (magic.len() - 1) {
+        let win = &mut buf[ii..ii + magic.len()];
 
-    // Perform the patch
-    buf[patch..][..new.len()].copy_from_slice(new);
+        if win == magic {
+            // Patch if magic matched
+            win.copy_from_slice(new);
+            patched = true;
+        }
+    }
+
+    assert!(patched, "Cannoli: Failed to find patch location");
 }
 
 /// We might have to re-create the thread locals as sometimes the TLS is not
@@ -213,6 +224,12 @@ fn with_hook<F: FnOnce(RefMut<'_, HookState>)>(callback: F) {
 }
 
 // ============================================================================
+
+/// Byte offset to register state off of `rbp` for the target architecture
+static REGISTER_OFFSET: AtomicUsize = AtomicUsize::new(0);
+
+/// Size of the register state for the target architecture
+static REGISTER_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 /// Gross macro we use to generate both the 32-bit and 64-bit versions of code
 /// for handling QEMU targets of different bitnesses. Unfortunately we kind of
@@ -247,7 +264,8 @@ macro_rules! create_bitness {
 /// Called by QEMU to initialize this library, we also return version
 /// information to QEMU so it knows that we're using the right version
 #[no_mangle]
-extern fn $init(arch: *const i8, big_endian: i32) -> &'static $cannoli {
+extern fn $init(arch: *const i8, big_endian: i32, gpr_offset: usize,
+        gpr_width: usize, num_gprs: usize) -> &'static $cannoli {
     /// Bindings information for QEMU
     const BINDINGS: $cannoli = $cannoli {
         version:          CANNOLI_VERSION,
@@ -258,6 +276,10 @@ extern fn $init(arch: *const i8, big_endian: i32) -> &'static $cannoli {
         mmap:             Some($mmap),
         munmap:           Some($munmap),
     };
+
+    // Save the register offset and size in the globals.
+    REGISTER_OFFSET.store(gpr_offset, Ordering::Relaxed);
+    REGISTER_SIZE.store(num_gprs * gpr_width, Ordering::Relaxed);
 
     // Convert architecture string to enum
     let arch = unsafe { Architecture::from_cstr(arch) };
@@ -315,6 +337,18 @@ unsafe extern fn $lift(pc: $tusize, buf: *mut u8, buf_size: usize) -> usize {
                 core::ptr::addr_of!(cannoli_insthook64_once_end) as usize,
             )
         }
+        (32, HookType::Register) => {
+            (
+                core::ptr::addr_of!(cannoli_reghook32)     as usize,
+                core::ptr::addr_of!(cannoli_reghook32_end) as usize,
+            )
+        }
+        (64, HookType::Register) => {
+            (
+                core::ptr::addr_of!(cannoli_reghook64)     as usize,
+                core::ptr::addr_of!(cannoli_reghook64_end) as usize,
+            )
+        }
         (_, HookType::Never) => {
             // Don't hook at all
             return 0;
@@ -348,6 +382,15 @@ unsafe extern fn $lift(pc: $tusize, buf: *mut u8, buf_size: usize) -> usize {
     // with the run-time address where that has been loaded
     patch(tmp, REPLACE_WITH_FLUSH.to_le_bytes(),
         ($flush as usize).to_le_bytes());
+
+    // Register hooks have extra patches
+    if matches!(hook_type, HookType::Register) {
+        // Patch register hook size and offset
+        patch(tmp, REPLACE_WITH_REGHOOK_OFFSET.to_le_bytes(),
+            (REGISTER_OFFSET.load(Ordering::Relaxed) as u32).to_le_bytes());
+        patch(tmp, REPLACE_WITH_REGHOOK_SIZE.to_le_bytes(),
+            (REGISTER_SIZE.load(Ordering::Relaxed) as u32).to_le_bytes());
+    }
 
     // Return the size of the shellcode we want to inject
     tmp.len()
@@ -677,6 +720,10 @@ extern {
     static cannoli_insthook32_once_end: u8;
     static cannoli_insthook64_once:     u8;
     static cannoli_insthook64_once_end: u8;
+    static cannoli_reghook32:           u8;
+    static cannoli_reghook32_end:       u8;
+    static cannoli_reghook64:           u8;
+    static cannoli_reghook64_end:       u8;
 }
 
 /// Magic value to replace with the address of the respective `flush_buffer`
@@ -685,6 +732,12 @@ const REPLACE_WITH_FLUSH: usize = 0xa03e2cd1b94c78fd;
 
 /// Magic value to replace with the current instructions PC
 const REPLACE_WITH_PC: usize = 0xcc5fe07bf3cfe384;
+
+/// Magic value to replace with the register byte offset off of rbp
+const REPLACE_WITH_REGHOOK_OFFSET: u32 = 0x3fcc88a3;
+
+/// Magic value to replace with the register state size
+const REPLACE_WITH_REGHOOK_SIZE: u32 = 0x652a1e21;
 
 // All of our shellcode is written in this global assembly block, and it is
 // ripped out and placed into the JIT. It's kinda neat. It seems ugly, but I
@@ -699,6 +752,8 @@ std::arch::global_asm!(r#"
 //
 // bits  - The bitness of the emulated target, either 32 or 64
 // width - The bitness divided by eight (number of bytes per target usize)
+// once  - Determines if this is a single-shot instruction hook, or an always
+//         hook
 .macro create_insthook bits, width, once
 
 // This code is injected _directly_ into QEMUs JIT, we have to make sure we
@@ -845,6 +900,81 @@ cannoli_memhook_\access\()_\data\()_\addr\():
 cannoli_memhook_\access\()_\data\()_\addr\()_end:
 .endm // create_memhook
 
+// Macro invoked when creating an register hook.
+//
+// bits  - The bitness of the emulated target, either 32 or 64
+// width - The bitness divided by eight (number of bytes per target usize)
+.macro create_reghook bits, width
+
+.global cannoli_reghook\bits\()
+cannoli_reghook\bits\():
+    // Determine size required for register hook metadata
+    lea r14, [r12 + 1 + 4 + \width]
+    add r14, {REPLACE_WITH_REGHOOK_SIZE}
+
+    // Make sure we're in bounds
+    cmp r14, r13
+    jbe 2f
+
+    // We're out of space! This happens "rarely", only when the buffer is full,
+    // so we can do much more complex work here. We can also save and restore
+    // some registers.
+    //
+    // We directly call into our Rust to reduce the icache pollution and to get
+    // some code sharing for the much more complex flushing operation
+    //
+    // Flushing gets us a new r12, r13, and r14
+    mov  r13, {REPLACE_WITH_FLUSH}
+    call r13
+
+2:
+.if \bits == 32
+    // Opcode
+    mov byte ptr [r12], 0x01
+
+    // Size of payload
+    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
+
+    // PC, directly put into memory from an immediate
+    mov dword ptr [r12 + 1 + 4], {REPLACE_WITH_PC}
+.elseif \bits == 64
+    // Opcode
+    mov byte ptr [r12], 0x81
+
+    // Size of payload
+    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
+
+    // Move PC into a register so we can use imm64 encoding
+    mov r14, {REPLACE_WITH_PC}
+    mov qword ptr [r12 + 1 + 4], r14
+.else
+.error "Invalid bitness passed to cannoli_reghook"
+.endif
+
+    // Fill in the registers
+    push rdi
+    push rsi
+    push rcx
+    lea rdi, [r12 + \width + 1 + 4]
+    lea rsi, [rbp + {REPLACE_WITH_REGHOOK_OFFSET}]
+    mov ecx, {REPLACE_WITH_REGHOOK_SIZE}
+    rep movsb
+    pop rcx
+    pop rsi
+    pop rdi
+
+    // Advance buffer
+    add r12, \width + 1 + 4
+    add r12, {REPLACE_WITH_REGHOOK_SIZE}
+
+.global cannoli_reghook\bits\()_end
+cannoli_reghook\bits\()_end:
+
+.endm // create_reghook
+
+create_reghook 32, 4
+create_reghook 64, 8
+
 // ===========================================================================
 // !!! WARNING !!!
 //
@@ -908,6 +1038,9 @@ multiple_create_memhook64 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10
     // Some magic values we use in our assembly for find-and-replace
     REPLACE_WITH_FLUSH = const REPLACE_WITH_FLUSH,
     REPLACE_WITH_PC    = const REPLACE_WITH_PC,
+
+    REPLACE_WITH_REGHOOK_SIZE   = const REPLACE_WITH_REGHOOK_SIZE,
+    REPLACE_WITH_REGHOOK_OFFSET = const REPLACE_WITH_REGHOOK_OFFSET,
 );
 
 // Create the 32-bit Cannoli implementation
