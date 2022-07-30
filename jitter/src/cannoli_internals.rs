@@ -618,7 +618,10 @@ unsafe extern fn $flush() {
         // Load the registers specified by the entry
         mov r12, [rsp + 0x00]
         mov r13, [rsp + 0x08]
-        mov r14, [rsp + 0x10]
+
+        // Don't update r14 as when we flush we need to preserve the r14
+        // register which still holds the address being read
+        //mov r14, [rsp + 0x10]
 
         // Restore the stack
         mov rsp, rbp
