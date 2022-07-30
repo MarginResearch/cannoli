@@ -1,7 +1,7 @@
 From 0d22343a3deeccc7dad027433fb5b01eec003347 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 01/11] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 01/12] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -351,7 +351,7 @@ index 0f9cfe96f2..739a4641c3 100644
 From 55fb223facc8314fbb3fcce04f2a2523f9206187 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 02/11] Style cleanup, more comments
+Subject: [PATCH 02/12] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -896,7 +896,7 @@ index 739a4641c3..dde9cd89b3 100644
 From 167924c0a100e17bd60ab6efd1ef56e89cfc6c80 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 03/11] Added PC support to memops
+Subject: [PATCH 03/12] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -1036,7 +1036,7 @@ index dde9cd89b3..590d997d65 100644
 From c579ec5f9f962778c36460a6a418f1c849fe80c8 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 04/11] Updated path
+Subject: [PATCH 04/12] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
@@ -1062,7 +1062,7 @@ index 20dc3c68a1..a71cd470f8 100644
 From 692ab530af756a465874d9c28d07aaed506fb277 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 05/11] Added --with-cannoli build flag
+Subject: [PATCH 05/12] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1141,7 +1141,7 @@ index a71cd470f8..657dfefc92 100644
 From bc3b30de68e01b228ed5037f2d9eeb5a06e06d24 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
-Subject: [PATCH 06/11] Fixed cannoli PC for memory operations
+Subject: [PATCH 06/12] Fixed cannoli PC for memory operations
 
 ---
  tcg/i386/tcg-target.c.inc | 21 ++++++-----------
@@ -1313,7 +1313,7 @@ index 590d997d65..d9d035576a 100644
 From 417865368fdd4727aae16c5a4315ca27cc23cd54 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
-Subject: [PATCH 07/11] Wrap code in cannoli as needed
+Subject: [PATCH 07/12] Wrap code in cannoli as needed
 
 ---
  tcg/tcg.c | 4 ++++
@@ -1342,7 +1342,7 @@ index d9d035576a..8c508de957 100644
 From 294a609f17f5922f04f94902487ad5f4e5822674 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 06:05:07 -0700
-Subject: [PATCH 08/11] Fixed cannoli not flushing on longjmps and signals
+Subject: [PATCH 08/12] Fixed cannoli not flushing on longjmps and signals
 
 ---
  accel/tcg/cpu-exec-common.c | 16 ++++++++++++++++
@@ -1896,7 +1896,7 @@ index 8c508de957..6d2de178e9 100644
 From d808d106265f45ad1e851d7685b190ef5f28295a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Tue, 31 May 2022 03:03:13 -0700
-Subject: [PATCH 09/11] Pass endian and arch information to cannoli
+Subject: [PATCH 09/12] Pass endian and arch information to cannoli
 
 ---
  linux-user/main.c | 5 +++--
@@ -1932,7 +1932,7 @@ index 06e7f0fbbc..472233097e 100644
 From 7fcd37a758edc29d4884d1887b120d5bcc8298d7 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 13 Jul 2022 13:58:58 -0700
-Subject: [PATCH 10/11] Added loongarch support
+Subject: [PATCH 10/12] Added loongarch support
 
 ---
  target/loongarch/cpu.h | 7 +++++++
@@ -1963,7 +1963,7 @@ index a36349df83..c01017ed97 100644
 From 9af94b2ec3a6b7d407ee5714cb00f297becd60d8 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 13 Jul 2022 19:03:29 -0700
-Subject: [PATCH 11/11] Added mmap hooks
+Subject: [PATCH 11/12] Added mmap hooks
 
 ---
  include/tcg/tcg.h |  2 +-
@@ -2043,6 +2043,133 @@ index 4e7a6be6ee..5389fb46f0 100644
      if (start & ~TARGET_PAGE_MASK)
          return -TARGET_EINVAL;
      len = TARGET_PAGE_ALIGN(len);
+-- 
+2.35.1
+
+
+From e2118661e8abefabe89363b2eecff1302c6ab970 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Fri, 29 Jul 2022 18:11:59 -0700
+Subject: [PATCH 12/12] Add register patches
+
+---
+ linux-user/main.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 93 insertions(+), 2 deletions(-)
+
+diff --git a/linux-user/main.c b/linux-user/main.c
+index 472233097e..5bb0a386cc 100644
+--- a/linux-user/main.c
++++ b/linux-user/main.c
+@@ -294,7 +294,7 @@ static void handle_arg_cannoli(const char *arg)
+     }
+ 
+     /* Get the entry point for Cannoli */
+-    Cannoli* (*query_version)(const char*, int) =
++    Cannoli* (*query_version)(const char*, int, size_t, size_t, size_t) =
+         dlsym(cannoli_lib, CANNOLI_ENTRY);
+     if(!query_version) {
+         fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
+@@ -302,8 +302,99 @@ static void handle_arg_cannoli(const char *arg)
+         exit(EXIT_FAILURE);
+     }
+ 
++    /* Determine the offset to GPRs and size of GPRs for this architecture in
++     * the `CPUArchState` structure (pointed to in the JIT by RBP)
++     */
++    size_t gpr_offset;
++    size_t gpr_width;
++    size_t num_gprs;
++
++    /* Create an arch state so we can get some offsets and sizes from it */
++    CPUArchState as;
++
++#ifdef TARGET_ALPHA
++    gpr_offset = offsetof(CPUArchState, ir);
++    gpr_width  = sizeof(as.ir[0]);
++    num_gprs   = sizeof(as.ir) / gpr_width;
++#endif /* TARGET_ALPHA */
++
++#ifdef TARGET_AARCH64
++    /* Idk if this is right, they might use the 32-bit regs in 32-bit mode when
++     * running on aarch64? Not sure. I don't think many Linux-user targets will
++     * use mixed modes anyways so we're probably fine
++     */
++    gpr_offset = offsetof(CPUArchState, xregs);
++    gpr_width  = sizeof(as.xregs[0]);
++    num_gprs   = sizeof(as.xregs) / gpr_width;
++#elif defined(TARGET_ARM)
++    gpr_offset = offsetof(CPUArchState, regs);
++    gpr_width  = sizeof(as.regs[0]);
++    num_gprs   = sizeof(as.regs) / gpr_width;
++#endif /* TARGET_AARCH64 */
++
++#ifdef TARGET_AVR
++    gpr_offset = offsetof(CPUArchState, r);
++    gpr_width  = sizeof(as.r[0]);
++    num_gprs   = sizeof(as.r) / gpr_width;
++#endif /* TARGET_AVR */
++
++#ifdef TARGET_HPPA
++    gpr_offset = offsetof(CPUArchState, gr);
++    gpr_width  = sizeof(as.gr[0]);
++    num_gprs   = sizeof(as.gr) / gpr_width;
++#endif /* TARGET_HPPA */
++
++#ifdef TARGET_M68K
++    gpr_offset = offsetof(CPUArchState, dregs);
++    gpr_width  = sizeof(as.dregs[0]);
++    num_gprs   = (sizeof(as.dregs) + sizeof(as.aregs)) / gpr_width;
++#endif /* TARGET_M68K */
++
++#ifdef TARGET_MIPS
++    gpr_offset = offsetof(CPUArchState, active_tc.gpr);
++    gpr_width  = sizeof(as.active_tc.gpr[0]);
++    num_gprs   = sizeof(as.active_tc.gpr) / gpr_width;
++#endif /* TARGET_MIPS */
++
++#ifdef TARGET_TRICORE
++    gpr_offset = offsetof(CPUArchState, gpr_a);
++    gpr_width  = sizeof(as.gpr_a[0]);
++    num_gprs   = (sizeof(as.gpr_a) + sizeof(as.gpr_d)) / gpr_width;
++#endif /* TARGET_TRICORE */
++
++#ifdef TARGET_OPENRISC
++    gpr_offset = offsetof(CPUArchState, shadow_gpr);
++    gpr_width  = sizeof(as.shadow_gpr[0]);
++    num_gprs   = sizeof(as.shadow_gpr) / gpr_width;
++#endif /* TARGET_OPENRISC */
++
++    /* All architectures that just use `CPUArchState->gregs` */
++#if defined(TARGET_SH4) || defined(TARGET_SPARC)
++    gpr_offset = offsetof(CPUArchState, gregs);
++    gpr_width  = sizeof(as.gregs[0]);
++    num_gprs   = sizeof(as.gregs) / gpr_width;
++#endif
++
++    /* All architectures that just use `CPUArchState->regs` */
++#if defined(TARGET_CRIS) || defined(TARGET_I386) || \
++        defined(TARGET_MICROBLAZE) || defined(TARGET_NIOS2) || \
++        defined(TARGET_RX) || defined(TARGET_S390X) || defined(TARGET_XTENSA)
++    gpr_offset = offsetof(CPUArchState, regs);
++    gpr_width  = sizeof(as.regs[0]);
++    num_gprs   = sizeof(as.regs) / gpr_width;
++#endif
++
++    /* All architectures that just use `CPUArchState->gpr` */
++#if defined(TARGET_HEXAGON) || defined(TARGET_LOONGARCH) || \
++        defined(TARGET_PPC) || defined(TARGET_RISCV)
++    gpr_offset = offsetof(CPUArchState, gpr);
++    gpr_width  = sizeof(as.gpr[0]);
++    num_gprs   = sizeof(as.gpr) / gpr_width;
++#endif /* TARGET_HEXAGON */
++
+     /* Query binding information */
+-    cannoli = query_version(UNAME_MACHINE, TARGET_BIG_ENDIAN != 0);
++    cannoli = query_version(UNAME_MACHINE, TARGET_BIG_ENDIAN != 0,
++        gpr_offset, gpr_width, num_gprs);
+ 
+     /* Check version */
+     if(cannoli->version != CANNOLI_VERSION) {
 -- 
 2.35.1
 
