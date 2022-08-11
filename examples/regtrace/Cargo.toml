@@ -13,6 +13,6 @@ cannoli = { path = "../../cannoli" }
 crate-type = ["cdylib"]
 
 [[bin]]
-name = "coverage_client"
+name = "coverage_client_regtrace"
 path = "src/main.rs"
 

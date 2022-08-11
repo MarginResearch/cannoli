@@ -1,5 +1,6 @@
 //! An example user of Cannoli which focuses entirely on perf benchmarking
 
+use std::sync::Arc;
 use std::time::Instant;
 use cannoli::{Cannoli, create_cannoli};
 
@@ -27,11 +28,16 @@ impl Cannoli for Benchmark {
     /// Not tracing anything
     type Trace = ();
 
-    /// Context structure
-    type Context = ();
+    type PidContext = ();
+    type TidContext = ();
+    
+    fn init_pid(_: &cannoli::ClientInfo) -> Arc<Self::PidContext> {
+        Arc::new(())
+    }
 
     /// Create contexts
-    fn init(_: &cannoli::ClientInfo) -> (Self, Self::Context) {
+    fn init_tid(_pid: &Self::PidContext,
+            _: &cannoli::ClientInfo) -> (Self, Self::TidContext) {
         (Benchmark {
             start:        Instant::now(),
             start_cycles: rdtsc(),
@@ -40,12 +46,14 @@ impl Cannoli for Benchmark {
         }, ())
     }
 
-    fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace> {
+    fn exec(_pid: &Self::PidContext, _tid: &Self::TidContext,
+            _pc: u64, trace: &mut Vec<Self::Trace>) {
         // Just return a marker indicating that we executed something
-        Some(())
+        trace.push(());
     }
 
-    fn trace(&mut self, _ctxt: &Self::Context, trace: Vec<Self::Trace>) {
+    fn trace(&mut self, _pid: &Self::PidContext, _tid: &Self::TidContext,
+            trace: &[Self::Trace]) {
         // Track number of instructions in the trace
         self.instructions += trace.len() as u64;
 

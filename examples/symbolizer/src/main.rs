@@ -1,5 +1,6 @@
 //! An example user of Cannoli which symbolizes a trace
 
+use std::sync::Arc;
 use cannoli::{Cannoli, create_cannoli};
 
 /// An original pointer address, and then a resolved symbol + offset for that
@@ -86,10 +87,17 @@ impl Cannoli for Symbolizer {
 
     /// Context, the shared, immutable context shared between all threads doing
     /// processing. We stuff our symbol table here.
-    type Context = Context;
+    type TidContext = Context;
+
+    type PidContext = ();
+    
+    fn init_pid(_: &cannoli::ClientInfo) -> Arc<Self::PidContext> {
+        Arc::new(())
+    }
 
     /// Load the symbol table
-    fn init(_: &cannoli::ClientInfo) -> (Self, Self::Context) {
+    fn init_tid(_pid: &Self::PidContext,
+            _: &cannoli::ClientInfo) -> (Self, Self::TidContext) {
         // Symbols
         let mut symbols = Vec::new();
 
@@ -113,32 +121,36 @@ impl Cannoli for Symbolizer {
     }
 
     /// Convert PCs into symbol + offset in parallel
-    fn exec(ctxt: &Self::Context, pc: u64) -> Option<Self::Trace> {
-        Some(Operation::Exec { pc: ctxt.resolve(pc) })
+    fn exec(_pid: &Self::PidContext, tid: &Self::TidContext,
+            pc: u64, trace: &mut Vec<Self::Trace>) {
+        trace.push(Operation::Exec { pc: tid.resolve(pc) });
     }
 
     /// Symbolize reads
-    fn read(ctxt: &Self::Context, pc: u64, addr: u64, val: u64, sz: u8)
-            -> Option<Self::Trace> {
-        Some(Operation::Read {
-            pc:   ctxt.resolve(pc),
-            addr: ctxt.resolve(addr),
+    fn read(_pid: &Self::PidContext, tid: &Self::TidContext,
+            pc: u64, addr: u64, val: u64, sz: u8,
+            trace: &mut Vec<Self::Trace>) {
+        trace.push(Operation::Read {
+            pc:   tid.resolve(pc),
+            addr: tid.resolve(addr),
             val, sz,
-        })
+        });
     }
 
     /// Symbolize writes
-    fn write(ctxt: &Self::Context, pc: u64, addr: u64, val: u64, sz: u8)
-            -> Option<Self::Trace> {
-        Some(Operation::Write {
-            pc:   ctxt.resolve(pc),
-            addr: ctxt.resolve(addr),
+    fn write(_pid: &Self::PidContext, tid: &Self::TidContext,
+             pc: u64, addr: u64, val: u64, sz: u8,
+             trace: &mut Vec<Self::Trace>) {
+        trace.push(Operation::Write {
+            pc:   tid.resolve(pc),
+            addr: tid.resolve(addr),
             val, sz,
-        })
+        });
     }
 
     /// Print the trace we processed!
-    fn trace(&mut self, _ctxt: &Self::Context, trace: Vec<Self::Trace>) {
+    fn trace(&mut self, _pid: &Self::PidContext, _tid: &Self::TidContext,
+             trace: &[Self::Trace]) {
         for op in trace {
             match op {
                 Operation::Exec { pc } => {

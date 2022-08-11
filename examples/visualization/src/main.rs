@@ -1,5 +1,6 @@
 #![feature(array_windows)]
 
+use std::sync::Arc;
 use std::time::Instant;
 use std::sync::atomic::{AtomicU64, Ordering};
 use cannoli::{Cannoli, create_cannoli};
@@ -51,28 +52,38 @@ impl Tracer {
 
 impl Cannoli for Tracer {
     type Trace = Trace;
-    type Context = ();
+    type TidContext = ();
+    type PidContext = ();
 
-    fn init(_: &cannoli::ClientInfo) -> (Self, Self::Context) {
+    fn init_pid(_: &cannoli::ClientInfo) -> Arc<Self::PidContext> {
+        Arc::new(())
+    }
+
+    fn init_tid(_pid: &Self::PidContext,
+            _: &cannoli::ClientInfo) -> (Self, Self::TidContext) {
         (Tracer {
         }, ())
     }
 
-    fn exec(_ctxt: &Self::Context, pc: u64) -> Option<Self::Trace> {
-        Some(Trace::Instr(pc as u32))
+    fn exec(_pid: &Self::PidContext, _tid: &Self::TidContext,
+            pc: u64, trace: &mut Vec<Self::Trace>) {
+        trace.push(Trace::Instr(pc as u32));
     }
 
-    fn read(_ctxt: &Self::Context, _pc: u64, addr: u64, _val: u64, _sz: u8)
-            -> Option<Self::Trace> {
-        Some(Trace::Load(addr as u32))
+    fn read(_pid: &Self::PidContext, _tid: &Self::TidContext,
+            _pc: u64, addr: u64, _val: u64, _sz: u8,
+            trace: &mut Vec<Self::Trace>) {
+        trace.push(Trace::Load(addr as u32));
     }
 
-    fn write(_ctxt: &Self::Context, _pc: u64, addr: u64, _val: u64, _sz: u8)
-            -> Option<Self::Trace> {
-        Some(Trace::Store(addr as u32))
+    fn write(_pid: &Self::PidContext, _tid: &Self::TidContext,
+             _pc: u64, addr: u64, _val: u64, _sz: u8,
+             trace: &mut Vec<Self::Trace>) {
+        trace.push(Trace::Store(addr as u32));
     }
 
-    fn trace(&mut self, _ctxt: &Self::Context, trace: Vec<Self::Trace>) {
+    fn trace(&mut self, _pid: &Self::PidContext, _tid: &Self::TidContext,
+             trace: &[Self::Trace]) {
         let mut loads  = 0;
         let mut stores = 0;
         let mut instrs = 0;
@@ -80,11 +91,11 @@ impl Cannoli for Tracer {
         for event in trace {
             match event {
                 Trace::Load(addr) => {
-                    self.set_pixel(addr as u32, (0x00, 0xff, 0x00));
+                    self.set_pixel(*addr as u32, (0x00, 0xff, 0x00));
                     loads += 1;
                 }
                 Trace::Store(addr) => {
-                    self.set_pixel(addr as u32, (0xff, 0x00, 0x00));
+                    self.set_pixel(*addr as u32, (0xff, 0x00, 0x00));
                     stores += 1;
                 }
                 Trace::Instr(_addr) => {

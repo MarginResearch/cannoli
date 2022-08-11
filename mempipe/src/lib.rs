@@ -286,8 +286,11 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
     /// Only one buffer can be issued at a time. Rust gives this safety since
     /// we take `&mut self` here, thus, only one [`ChunkWriter`] can exist for
     /// any given [`SendPipe`] at a given time
+    ///
+    /// If `blocking` is set, the write blocks until the receiver processed it
     #[inline]
-    pub fn alloc_buffer(&mut self) -> ChunkWriter<CHUNK_SIZE, NUM_BUFFERS> {
+    pub fn alloc_buffer(&mut self, blocking: bool)
+            -> ChunkWriter<CHUNK_SIZE, NUM_BUFFERS> {
         // Get the pipe
         let pipe = unsafe { &*self.mem_pipe };
 
@@ -302,6 +305,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
                         mem_pipe: pipe,
                         idx:      ii,
                         written:  0,
+                        blocking,
 
                         // Construct a raw pointer to the first byte
                         bytes: UnsafeCell::raw_get(
@@ -355,6 +359,9 @@ pub struct ChunkWriter<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
 
     /// Tracks the number of initialized bytes in the chunk
     written: usize,
+
+    /// Determines if we should block until the buffer is owned by us again
+    blocking: bool,
 }
 
 impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
@@ -421,6 +428,13 @@ impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Drop for
         // Flip ownership, using release semantics to make sure all writes have
         // become visible to the core we're sending to
         self.mem_pipe.client_owned[self.idx].store(true, Ordering::Release);
+
+        if self.blocking {
+            // Wait for the pipe to be owned by us again
+            while self.mem_pipe.client_owned[self.idx].load(Ordering::Relaxed){
+                core::hint::spin_loop();
+            }
+        }
     }
 }
 
@@ -671,7 +685,7 @@ fn toot() -> Result<()> {
 
     let it = Instant::now();
     for _ in 0..10000000 {
-        tx.alloc_buffer();
+        tx.alloc_buffer(false);
     }
 
     let _ = thr.join().unwrap();

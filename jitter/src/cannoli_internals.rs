@@ -32,7 +32,7 @@ const NUM_BUFFERS: usize = 16;
 include!(concat!(env!("OUT_DIR"), "/ffi_bindings.rs"));
 
 extern "Rust" {
-    fn hook_inst(_pc: u64) -> HookType;
+    fn hook_inst(_pc: u64, _branch: bool) -> HookType;
     fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool;
 }
 
@@ -305,9 +305,10 @@ extern fn $init(arch: *const i8, big_endian: i32, gpr_offset: usize,
 /// this instruction start. If it is zero, no additional instructions are
 /// generated
 #[no_mangle]
-unsafe extern fn $lift(pc: $tusize, buf: *mut u8, buf_size: usize) -> usize {
+unsafe extern fn $lift(pc: $tusize, bb_end: i32,
+        buf: *mut u8, buf_size: usize) -> usize {
     // Get the requested hook type for this instruction
-    let hook_type = hook_inst(pc as u64);
+    let hook_type = hook_inst(pc as u64, bb_end != 0);
 
     // Get the start and end address of the shellcode
     //
@@ -412,7 +413,7 @@ unsafe extern fn $entry(out_regs: *mut usize) {
             "Cannoli: Whoa, got JIT entry without a JIT exit!");
 
         // Allocate a new buffer in our pipe
-        let mut buffer = hook.pipe.alloc_buffer();
+        let mut buffer = hook.pipe.alloc_buffer(false);
 
         // Populate `r12`, `r13` and `r14` with:
         //
@@ -651,8 +652,8 @@ unsafe extern fn $mmap(start: $tusize, len: $tusize,
         // Shouldn't have an active buffer
         assert!(hook.active_buffer.is_none(), "mmap from inside the JIT?");
 
-        // Allocate a new buffer in our pipe
-        let buffer = hook.pipe.alloc_buffer();
+        // Allocate a new blocking buffer in our pipe
+        let buffer = hook.pipe.alloc_buffer(true);
 
         // Convert the path into bytes
         let path: &[u8] = if path.is_null() {
@@ -691,8 +692,8 @@ unsafe extern fn $munmap(start: $tusize, len: $tusize) {
         // Shouldn't have an active buffer
         assert!(hook.active_buffer.is_none(), "munmap from inside the JIT?");
 
-        // Allocate a new buffer in our pipe
-        let buffer = hook.pipe.alloc_buffer();
+        // Allocate a new blocking buffer in our pipe
+        let buffer = hook.pipe.alloc_buffer(true);
 
         // Temporary vector for building packet
         let mut tmp = Vec::new();

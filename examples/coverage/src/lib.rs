@@ -7,7 +7,7 @@ use jitter::HookType;
 ///
 /// This may be called from multiple threads
 #[no_mangle]
-fn hook_inst(_pc: u64) -> HookType {
+fn hook_inst(_pc: u64, _branch: bool) -> HookType {
     // We only care about binary hit vs not hit so we are okay with oneshot
     // coverage
     HookType::Once

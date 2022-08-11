@@ -7,7 +7,7 @@ use jitter::HookType;
 ///
 /// This may be called from multiple threads
 #[no_mangle]
-fn hook_inst(_pc: u64) -> HookType {
+fn hook_inst(_pc: u64, _branch: bool) -> HookType {
     HookType::Always
 }
 

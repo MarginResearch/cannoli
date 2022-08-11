@@ -30,11 +30,17 @@ struct Cannoli32 {
     /// QEMU gives a temporary buffer pointed to by `buf`, for `buf_size`
     /// bytes which is used as instruction storage.
     ///
+    /// `bb_end` indicates that the instruction being lifted can end a basic
+    /// block, which is a strong indicator that it is a branch instruction.
+    /// This might be `true` for some obscure non-branch cases, however for
+    /// branches it is always `true`
+    ///
     /// This function returns the number of bytes to insert into the JIT stream
     /// at this instruction start. If it is zero, no additional instructions
     /// are generated
-    size_t (*lift_instruction)(uint32_t pc, uint8_t *buf, size_t buf_size);
-    
+    size_t (*lift_instruction)(uint32_t pc, int bb_end,
+        uint8_t *buf, size_t buf_size);
+
     /// Invoked from QEMU when entering the JIT. This provides an opportunity
     /// for us to introduce some register state to the JIT.
     ///
@@ -97,11 +103,17 @@ struct Cannoli64 {
     /// QEMU gives a temporary buffer pointed to by `buf`, for `buf_size`
     /// bytes which is used as instruction storage.
     ///
+    /// `bb_end` indicates that the instruction being lifted can end a basic
+    /// block, which is a strong indicator that it is a branch instruction.
+    /// This might be `true` for some obscure non-branch cases, however for
+    /// branches it is always `true`
+    ///
     /// This function returns the number of bytes to insert into the JIT stream
     /// at this instruction start. If it is zero, no additional instructions
     /// are generated
-    size_t (*lift_instruction)(uint64_t pc, uint8_t *buf, size_t buf_size);
-    
+    size_t (*lift_instruction)(uint64_t pc,
+        int bb_end, uint8_t *buf, size_t buf_size);
+
     /// Invoked from QEMU when entering the JIT. This provides an opportunity
     /// for us to introduce some register state to the JIT.
     ///

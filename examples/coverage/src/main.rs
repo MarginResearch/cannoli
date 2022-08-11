@@ -49,12 +49,16 @@ impl Cannoli for Coverage {
     /// The type emit in the serialized trace
     type Trace = Trace;
 
-    /// Context, the shared, immutable context shared between all threads doing
-    /// processing. We stuff our symbol table here.
-    type Context = Context;
+    type PidContext = ();
+    type TidContext = Context;
+    
+    fn init_pid(_: &cannoli::ClientInfo) -> Arc<Self::PidContext> {
+        Arc::new(())
+    }
 
     /// Load the symbol table
-    fn init(ci: &cannoli::ClientInfo) -> (Self, Self::Context) {
+    fn init_tid(_pid: &Self::PidContext,
+            ci: &cannoli::ClientInfo) -> (Self, Self::TidContext) {
         let db = SYMBOLS_BY_PID.lock().unwrap()
             .entry(ci.pid).or_insert_with(|| {
                 Arc::new(CoverageDb {
@@ -70,27 +74,27 @@ impl Cannoli for Coverage {
     }
 
     // Look for dynamic code being loaded
-    fn mmap(_ctxt: &Self::Context, mmap_addr: u64, _len: u64,
+    fn mmap(_pid: &Self::PidContext,
+            _tid: &Self::TidContext, mmap_addr: u64, _len: u64,
             anon: bool, _read: bool, _write: bool, _exec: bool,
-            path: &str, offset: u64)
-                -> Option<Self::Trace> {
+            path: &str, offset: u64, trace: &mut Vec<Self::Trace>) {
         // Ignore mappings that are not file mappings
         if anon || offset != 0 {
-            return None;
+            return;
         }
 
         // First we have to figure out the base address of the ELF
         let output = Command::new("readelf").args(&[
             "-W", "-l", path,
-        ]).output().ok()?;
+        ]).output().unwrap();
 
         // Do nothing if we got an error running `readelf`
         if !output.status.success() {
-            return None;
+            return;
         }
         
         // Parse the headers
-        let stdout = String::from_utf8(output.stdout).ok()?;
+        let stdout = String::from_utf8(output.stdout).unwrap();
         let mut base = None;
         for line in stdout.lines() {
             // Skip non-load sections
@@ -113,7 +117,7 @@ impl Cannoli for Coverage {
         }
 
         // Make sure we got the base for the file
-        let base = base?;
+        let base = base.unwrap();
 
         println!("Resolved {path} loaded at {mmap_addr:#x}, based at {base:#x}");
 
@@ -121,16 +125,16 @@ impl Cannoli for Coverage {
         let output = Command::new("nm").args(&[
             "--demangle",
             path
-        ]).output().ok()?;
+        ]).output().unwrap();
 
         // Do nothing if we got an error running `nm`
         if !output.status.success() {
-            return None;
+            return;
         }
 
         // Get stdout as a string
         let mut syms = BTreeMap::new();
-        let stdout = String::from_utf8(output.stdout).ok()?;
+        let stdout = String::from_utf8(output.stdout).unwrap();
         for line in stdout.lines() {
             let mut spl = line.splitn(3, " ");
             if let Ok(addr) = u64::from_str_radix(spl.next().unwrap(), 16) {
@@ -147,22 +151,25 @@ impl Cannoli for Coverage {
 
         println!("    Added {} symbols for {path}", syms.len());
 
-        Some(Trace::AddSymbols(syms))
+        trace.push(Trace::AddSymbols(syms));
     }
 
-    fn munmap(_ctxt: &Self::Context, base: u64, len: u64)
-            -> Option<Self::Trace> {
-        Some(Trace::RemoveSymbols { base, len })
+    fn munmap(_pid: &Self::PidContext,
+              _tid: &Self::TidContext, base: u64, len: u64,
+              trace: &mut Vec<Self::Trace>) {
+        trace.push(Trace::RemoveSymbols { base, len });
     }
 
-    fn exec(_ctxt: &Self::Context, pc: u64) -> Option<Self::Trace> {
-        Some(Trace::Exec(pc))
+    fn exec(_pid: &Self::PidContext, _tid: &Self::TidContext,
+            pc: u64, trace: &mut Vec<Self::Trace>) {
+        trace.push(Trace::Exec(pc));
     }
 
-    fn trace(&mut self, ctxt: &Self::Context, trace: Vec<Self::Trace>) {
+    fn trace(&mut self, _pid: &Self::PidContext,
+            tid: &Self::TidContext, trace: &[Self::Trace]) {
         // Get access to the symbol and coverage databases
-        let mut syms = ctxt.db.symbols.lock().unwrap();
-        let mut cov  = ctxt.db.coverage.lock().unwrap();
+        let mut syms = tid.db.symbols.lock().unwrap();
+        let mut cov  = tid.db.coverage.lock().unwrap();
 
         for trace in trace {
             match trace {
@@ -171,20 +178,20 @@ impl Cannoli for Coverage {
                     let (sym, off) = syms.range(..=pc)
                         .next_back().map(|(sym_pc, sym)| {
                             (sym.clone(), pc - *sym_pc)
-                        }).unwrap_or((ctxt.db.unknown_sym.clone(), pc));
+                        }).unwrap_or((tid.db.unknown_sym.clone(), *pc));
 
                     println!("cov {:10} | {sym}+{off:#x}", cov.len());
                     cov.insert((sym, off));
                 }
                 Trace::AddSymbols(new_syms) => {
                     // Add the symbols
-                    syms.extend(new_syms);
+                    syms.extend(new_syms.clone());
                 }
                 Trace::RemoveSymbols { base, len } => {
                     // Remove symbols that were in this region
                     syms.retain(|&addr, _| {
                         // Only keep things outside of this region
-                        addr < base || addr >= base + len
+                        addr < *base || addr >= base + len
                     });
                 }
             }

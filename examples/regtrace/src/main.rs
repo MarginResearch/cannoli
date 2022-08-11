@@ -2,6 +2,7 @@
 
 #![feature(array_chunks)]
 
+use std::sync::Arc;
 use cannoli::{Cannoli, create_cannoli};
 
 /// The structure we implement [`Cannoli`] for!
@@ -16,21 +17,27 @@ impl Cannoli for Coverage {
 
     /// Context, the shared, immutable context shared between all threads doing
     /// processing. We stuff our symbol table here.
-    type Context = Context;
+    type TidContext = Context;
+    type PidContext = ();
+    
+    fn init_pid(_: &cannoli::ClientInfo) -> Arc<Self::PidContext> {
+        Arc::new(())
+    }
 
     /// Load the symbol table
-    fn init(_ci: &cannoli::ClientInfo) -> (Self, Self::Context) {
+    fn init_tid(_pid: &Self::PidContext,
+                _ci: &cannoli::ClientInfo) -> (Self, Self::TidContext) {
         (Self, Context)
     }
 
-    fn regs(_ctxt: &Context, pc: u64, regs: &[u8]) -> Option<()> {
+    fn regs(_pid: &Self::PidContext, _tid: &Self::TidContext,
+            pc: u64, regs: &[u8], _trace: &mut Vec<Self::Trace>) {
         let mut parsed = [0; 32];
         for (ii, chunk) in regs.array_chunks::<4>().enumerate() {
             parsed[ii] = u32::from_le_bytes(*chunk);
         }
 
         println!("Regs {pc:#x} {parsed:#x?}");
-        None
     }
 }
 

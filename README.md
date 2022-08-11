@@ -156,7 +156,7 @@ use jitter::HookType;
 ///
 /// This may be called from multiple threads
 #[no_mangle]
-fn hook_inst(_pc: u64) -> HookType {
+fn hook_inst(_pc: u64, _branch: bool) -> HookType {
     HookType::Always
 }
 
@@ -205,16 +205,7 @@ As an implementer of this trait, you must implement `init`. This is where you
 create a structure for both a single-threaded mutable context (`Self`), as well
 as a multi-threaded shared immutable context (`Self::Context`).
 
-You then optionally can implement the following callbacks:
-
-```rust
-fn exec(_ctxt: &Self::Context, _pc: u64) -> Option<Self::Trace>;
-fn read(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64, _sz: u8)
-    -> Option<Self::Trace>; 
-fn write(_ctxt: &Self::Context, _pc: u64, _addr: u64, _val: u64, _sz: u8);
-    -> Option<Self::Trace>; 
-fn trace(&mut self, _ctxt: &Self::Context, _trace: &[Self::Trace])
-```
+You then optionally can implement the callbacks for the `Cannoli` trait.
 
 These callbacks are relatively self-explanatory, with the exception of the
 threading aspects. The three main execution callbacks `exec`, `read`, and
@@ -226,11 +217,10 @@ to know the ordering/sequence of instructions or memory accesses. For example,
 applying symbols where you convert from a `pc` into a symbol + address should
 be done here, such that you can symbolize the trace in parallel.
 
-All of the main callbacks `exec`, `read`, and `write`, return an
-`Option<Self::Trace>` type. This is a user-defined type which should be thought
-of as a form of `filter_map`. If you return `None`, the event is not placed
-into the trace, if you return `Some(your_value)` then `your_value` will be
-placed sequentially into a trace buffer.
+All of the main callbacks (eg. `exec`) provide access to a `trace` buffer.
+Pushing values of type `Self::Trace` to this buffer allow you to sequence data.
+Pushing events to this buffer allows them to be viewed _in-execution-order_
+when the trace is processed in the `trace()` callback.
 
 This trace is then exposed back to the user fully in-order via the `trace`
 callback. The `trace` callback is called from various threads (eg. you might
