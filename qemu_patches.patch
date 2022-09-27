@@ -1619,7 +1619,7 @@ index 4d8f48e8c7..0eff99a80d 100644
 @@ -155,6 +155,13 @@ typedef struct CPUArchState {
  
      /* Fields from here on are preserved across CPU reset. */
-     uint32_t features;
+     uint64_t features;
 +
 +#ifdef CONFIG_CANNOLI
 +    /* Storage for Cannoli's internal register state */
