@@ -50,6 +50,12 @@ Checkout QEMU
 git clone https://gitlab.com/qemu-project/qemu.git
 ```
 
+Switch to the current QEMU branch we're working on
+
+```
+git checkout 00b1faea41d283e931256aa78aa975a369ec3ae6
+```
+
 Apply patch from `qemu_patches.patch`
 
 ```
