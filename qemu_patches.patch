@@ -1,7 +1,7 @@
-From 895e82e312e515656fa7010f2629c03cb182cccc Mon Sep 17 00:00:00 2001
+From 43cc5f827d47fec9fdc04acd178eb248125c0a83 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 11 May 2022 07:53:06 -0700
-Subject: [PATCH 01/13] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
+Subject: [PATCH 01/14] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
 
 ---
  include/tcg/tcg.h         |  10 +++
@@ -11,7 +11,7 @@ Subject: [PATCH 01/13] Synced with 742848ad987b27fdbeab11323271ca7d196152fb
  4 files changed, 235 insertions(+)
 
 diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
-index 26a70526f1..063c4c18d1 100644
+index 6f497172f8..9e91535b66 100644
 --- a/include/tcg/tcg.h
 +++ b/include/tcg/tcg.h
 @@ -35,6 +35,16 @@
@@ -32,10 +32,10 @@ index 26a70526f1..063c4c18d1 100644
  #define MAX_OP_PER_INSTR 266
  
 diff --git a/linux-user/main.c b/linux-user/main.c
-index e44bdb17b8..12b9dd2e17 100644
+index 4290651c3c..bbd8024cd2 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -58,6 +58,10 @@
+@@ -59,6 +59,10 @@
  #include "semihosting/semihost.h"
  #endif
  
@@ -46,7 +46,7 @@ index e44bdb17b8..12b9dd2e17 100644
  #ifndef AT_FLAGS_PRESERVE_ARGV0
  #define AT_FLAGS_PRESERVE_ARGV0_BIT 0
  #define AT_FLAGS_PRESERVE_ARGV0 (1 << AT_FLAGS_PRESERVE_ARGV0_BIT)
-@@ -90,6 +94,13 @@ static bool enable_strace;
+@@ -91,6 +95,13 @@ static bool enable_strace;
  static int last_log_mask;
  static const char *last_log_filename;
  
@@ -60,7 +60,7 @@ index e44bdb17b8..12b9dd2e17 100644
  /*
   * When running 32-on-64 we should make sure we can fit all of the possible
   * guest address space into a contiguous chunk of virtual host memory.
-@@ -264,6 +275,37 @@ static void handle_arg_log_filename(const char *arg)
+@@ -271,6 +282,37 @@ static void handle_arg_log_filename(const char *arg)
      last_log_filename = arg;
  }
  
@@ -98,7 +98,7 @@ index e44bdb17b8..12b9dd2e17 100644
  static void handle_arg_set_env(const char *arg)
  {
      char *r, *p, *token;
-@@ -467,6 +509,10 @@ static const struct qemu_argument arg_table[] = {
+@@ -484,6 +526,10 @@ static const struct qemu_argument arg_table[] = {
       "range[,...]","filter logging based on address range"},
      {"D",          "QEMU_LOG_FILENAME", true, handle_arg_log_filename,
       "logfile",     "write logs to 'logfile' (default stderr)"},
@@ -110,7 +110,7 @@ index e44bdb17b8..12b9dd2e17 100644
       "pagesize",   "set the host page size to 'pagesize'"},
      {"singlestep", "QEMU_SINGLESTEP",  false, handle_arg_singlestep,
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index d52206ba4d..687fc2cc09 100644
+index c71c3e664d..1daa4862df 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
 @@ -45,9 +45,11 @@ static const int tcg_target_reg_alloc_order[] = {
@@ -125,7 +125,7 @@ index d52206ba4d..687fc2cc09 100644
      TCG_REG_R15,
      TCG_REG_R10,
      TCG_REG_R11,
-@@ -2245,9 +2247,36 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2246,9 +2248,36 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
          tcg_out_test_alignment(s, true, addrlo, addrhi, a_bits);
      }
  
@@ -162,7 +162,7 @@ index d52206ba4d..687fc2cc09 100644
  #endif
  }
  
-@@ -2336,6 +2365,28 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2337,6 +2366,28 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
      add_qemu_ldst_label(s, false, is64, oi, datalo, datahi, addrlo, addrhi,
                          s->code_ptr, label_ptr);
  #else
@@ -191,7 +191,7 @@ index d52206ba4d..687fc2cc09 100644
      a_bits = get_alignment_bits(opc);
      if (a_bits) {
          tcg_out_test_alignment(s, false, addrlo, addrhi, a_bits);
-@@ -4021,6 +4072,57 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4030,6 +4081,57 @@ static void tcg_target_qemu_prologue(TCGContext *s)
          tcg_out_push(s, tcg_target_callee_save_regs[i]);
      }
  
@@ -249,7 +249,7 @@ index d52206ba4d..687fc2cc09 100644
  #if TCG_TARGET_REG_BITS == 32
      tcg_out_ld(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_ESP,
                 (ARRAY_SIZE(tcg_target_callee_save_regs) + 1) * 4);
-@@ -4066,6 +4168,49 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4075,6 +4177,49 @@ static void tcg_target_qemu_prologue(TCGContext *s)
      if (have_avx2) {
          tcg_out_vex_opc(s, OPC_VZEROUPPER, 0, 0, 0, 0);
      }
@@ -300,10 +300,10 @@ index d52206ba4d..687fc2cc09 100644
          tcg_out_pop(s, tcg_target_callee_save_regs[i]);
      }
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index 0f9cfe96f2..739a4641c3 100644
+index d502327be2..81cf762daf 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -4350,6 +4350,40 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4721,6 +4721,40 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
  #endif
                  s->gen_insn_data[num_insns][i] = a;
              }
@@ -345,13 +345,13 @@ index 0f9cfe96f2..739a4641c3 100644
          case INDEX_op_discard:
              temp_dead(s, arg_temp(op->args[0]));
 -- 
-2.35.1
+2.39.1
 
 
-From 82d6e64e60f52b842a38261d53f25b6a89e7dc71 Mon Sep 17 00:00:00 2001
+From 89db875a3c846918f3c183f712948381ede6307d Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 12 May 2022 19:18:52 -0700
-Subject: [PATCH 02/13] Style cleanup, more comments
+Subject: [PATCH 02/14] Style cleanup, more comments
 
 ---
  include/tcg/tcg.h         |  14 ++-
@@ -361,7 +361,7 @@ Subject: [PATCH 02/13] Style cleanup, more comments
  4 files changed, 217 insertions(+), 100 deletions(-)
 
 diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
-index 063c4c18d1..20dc3c68a1 100644
+index 9e91535b66..9d0d14f635 100644
 --- a/include/tcg/tcg.h
 +++ b/include/tcg/tcg.h
 @@ -35,15 +35,23 @@
@@ -392,10 +392,10 @@ index 063c4c18d1..20dc3c68a1 100644
  /* XXX: make safe guess about sizes */
  #define MAX_OP_PER_INSTR 266
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 12b9dd2e17..06e7f0fbbc 100644
+index bbd8024cd2..1ebb10cb97 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -59,8 +59,11 @@
+@@ -60,8 +60,11 @@
  #endif
  
  #ifdef CANNOLI
@@ -408,7 +408,7 @@ index 12b9dd2e17..06e7f0fbbc 100644
  
  #ifndef AT_FLAGS_PRESERVE_ARGV0
  #define AT_FLAGS_PRESERVE_ARGV0_BIT 0
-@@ -96,10 +99,10 @@ static const char *last_log_filename;
+@@ -97,10 +100,10 @@ static const char *last_log_filename;
  
  #ifdef CANNOLI
  /*
@@ -421,7 +421,7 @@ index 12b9dd2e17..06e7f0fbbc 100644
  
  /*
   * When running 32-on-64 we should make sure we can fit all of the possible
-@@ -276,16 +279,21 @@ static void handle_arg_log_filename(const char *arg)
+@@ -283,16 +286,21 @@ static void handle_arg_log_filename(const char *arg)
  }
  
  #ifdef CANNOLI
@@ -445,7 +445,7 @@ index 12b9dd2e17..06e7f0fbbc 100644
      Cannoli* (*query_version)(void) = dlsym(cannoli_lib, CANNOLI_ENTRY);
      if(!query_version) {
          fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
-@@ -293,10 +301,10 @@ static void handle_arg_cannoli(const char *arg)
+@@ -300,10 +308,10 @@ static void handle_arg_cannoli(const char *arg)
          exit(EXIT_FAILURE);
      }
  
@@ -458,7 +458,7 @@ index 12b9dd2e17..06e7f0fbbc 100644
      if(cannoli->version != CANNOLI_VERSION) {
          fprintf(stderr, "Cannoli: Version mismatch, expected %" PRIx64
              ", got %" PRIx64 "\n",
-@@ -304,7 +312,7 @@ static void handle_arg_cannoli(const char *arg)
+@@ -311,7 +319,7 @@ static void handle_arg_cannoli(const char *arg)
          exit(EXIT_FAILURE);
      }
  }
@@ -468,7 +468,7 @@ index 12b9dd2e17..06e7f0fbbc 100644
  static void handle_arg_set_env(const char *arg)
  {
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index 687fc2cc09..ac71677f4f 100644
+index 1daa4862df..0c7bb914f8 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
 @@ -46,10 +46,14 @@ static const int tcg_target_reg_alloc_order[] = {
@@ -487,7 +487,7 @@ index 687fc2cc09..ac71677f4f 100644
      TCG_REG_R15,
      TCG_REG_R10,
      TCG_REG_R11,
-@@ -2229,6 +2233,30 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2230,6 +2234,30 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
      oi = *args++;
      opc = get_memop(oi);
  
@@ -518,7 +518,7 @@ index 687fc2cc09..ac71677f4f 100644
  #if defined(CONFIG_SOFTMMU)
      mem_index = get_mmuidx(oi);
  
-@@ -2247,37 +2275,57 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2248,37 +2276,57 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
          tcg_out_test_alignment(s, true, addrlo, addrhi, a_bits);
      }
  
@@ -587,7 +587,7 @@ index 687fc2cc09..ac71677f4f 100644
  }
  
  static void tcg_out_qemu_st_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
-@@ -2352,41 +2400,60 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2353,41 +2401,60 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
      oi = *args++;
      opc = get_memop(oi);
  
@@ -667,7 +667,7 @@ index 687fc2cc09..ac71677f4f 100644
      a_bits = get_alignment_bits(opc);
      if (a_bits) {
          tcg_out_test_alignment(s, false, addrlo, addrhi, a_bits);
-@@ -4073,16 +4140,32 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4082,16 +4149,32 @@ static void tcg_target_qemu_prologue(TCGContext *s)
      }
  
  #ifdef CANNOLI
@@ -709,7 +709,7 @@ index 687fc2cc09..ac71677f4f 100644
          tcg_out_push(s, TCG_REG_RAX);
          tcg_out_push(s, TCG_REG_RDI);
          tcg_out_push(s, TCG_REG_RSI);
-@@ -4093,23 +4176,30 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4102,23 +4185,30 @@ static void tcg_target_qemu_prologue(TCGContext *s)
          tcg_out_push(s, TCG_REG_R10);
          tcg_out_push(s, TCG_REG_R11);
  
@@ -747,7 +747,7 @@ index 687fc2cc09..ac71677f4f 100644
          tcg_out_addi(s, TCG_REG_RSP, 32);
          tcg_out_pop(s, TCG_REG_R11);
          tcg_out_pop(s, TCG_REG_R10);
-@@ -4121,7 +4211,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4130,7 +4220,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
          tcg_out_pop(s, TCG_REG_RDI);
          tcg_out_pop(s, TCG_REG_RAX);
      }
@@ -756,7 +756,7 @@ index 687fc2cc09..ac71677f4f 100644
  
  #if TCG_TARGET_REG_BITS == 32
      tcg_out_ld(s, TCG_TYPE_PTR, TCG_AREG0, TCG_REG_ESP,
-@@ -4170,16 +4260,23 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4179,16 +4269,23 @@ static void tcg_target_qemu_prologue(TCGContext *s)
      }
  
  #ifdef CANNOLI
@@ -789,7 +789,7 @@ index 687fc2cc09..ac71677f4f 100644
          tcg_out_push(s, TCG_REG_RAX);
          tcg_out_push(s, TCG_REG_RDI);
          tcg_out_push(s, TCG_REG_RSI);
-@@ -4190,15 +4287,18 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4199,15 +4296,18 @@ static void tcg_target_qemu_prologue(TCGContext *s)
          tcg_out_push(s, TCG_REG_R10);
          tcg_out_push(s, TCG_REG_R11);
  
@@ -811,7 +811,7 @@ index 687fc2cc09..ac71677f4f 100644
          tcg_out_pop(s, TCG_REG_R11);
          tcg_out_pop(s, TCG_REG_R10);
          tcg_out_pop(s, TCG_REG_R9);
-@@ -4209,7 +4309,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+@@ -4218,7 +4318,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
          tcg_out_pop(s, TCG_REG_RDI);
          tcg_out_pop(s, TCG_REG_RAX);
      }
@@ -821,10 +821,10 @@ index 687fc2cc09..ac71677f4f 100644
      for (i = ARRAY_SIZE(tcg_target_callee_save_regs) - 1; i >= 0; i--) {
          tcg_out_pop(s, tcg_target_callee_save_regs[i]);
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index 739a4641c3..dde9cd89b3 100644
+index 81cf762daf..09b58b921b 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -4352,35 +4352,36 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4723,35 +4723,36 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
              }
  
  #ifdef CANNOLI
@@ -890,13 +890,13 @@ index 739a4641c3..dde9cd89b3 100644
              }
  #endif
 -- 
-2.35.1
+2.39.1
 
 
-From d15d62999d8211d0dd13f075f348039bba573a73 Mon Sep 17 00:00:00 2001
+From f8596a1c88c05ef16fb0b54bb78e9313f36669b1 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 00:27:52 -0700
-Subject: [PATCH 03/13] Added PC support to memops
+Subject: [PATCH 03/14] Added PC support to memops
 
 ---
  tcg/i386/tcg-target.c.inc | 47 +++++++++++++++++++++++++++++++++++++--
@@ -904,10 +904,10 @@ Subject: [PATCH 03/13] Added PC support to memops
  2 files changed, 57 insertions(+), 2 deletions(-)
 
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index ac71677f4f..dac39484a5 100644
+index 0c7bb914f8..8fd9bc91fa 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
-@@ -2213,7 +2213,13 @@ static void tcg_out_qemu_ld_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
+@@ -2214,7 +2214,13 @@ static void tcg_out_qemu_ld_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
  /* XXX: qemu_ld and qemu_st could be modified to clobber only EDX and
     EAX. It will be useful once fixed registers globals are less
     common. */
@@ -921,7 +921,7 @@ index ac71677f4f..dac39484a5 100644
  {
      TCGReg datalo, datahi, addrlo;
      TCGReg addrhi __attribute__((unused));
-@@ -2311,7 +2317,7 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2312,7 +2318,7 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args, bool is64)
           * we saved it there above.
           */
          size_t shellcode_size = cannoli->lift_memop(
@@ -930,7 +930,7 @@ index ac71677f4f..dac39484a5 100644
              sizeof(shellcode));
  
          /* Make sure the SO library author is not being naughty ;) */
-@@ -2380,7 +2386,13 @@ static void tcg_out_qemu_st_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
+@@ -2381,7 +2387,13 @@ static void tcg_out_qemu_st_direct(TCGContext *s, TCGReg datalo, TCGReg datahi,
      }
  }
  
@@ -944,7 +944,7 @@ index ac71677f4f..dac39484a5 100644
  {
      TCGReg datalo, datahi, addrlo;
      TCGReg addrhi __attribute__((unused));
-@@ -2425,7 +2437,7 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
+@@ -2426,7 +2438,7 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
          }
  
          /* Invoke lifting callback */
@@ -953,7 +953,7 @@ index ac71677f4f..dac39484a5 100644
              1, datalo, addrlo, opc & MO_SIZE, shellcode, sizeof(shellcode));
  
          /* Make sure the SO library author is not being naughty ;) */
-@@ -2487,7 +2499,21 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+@@ -2524,7 +2536,21 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
      a2 = args[2];
      const_a2 = const_args[2];
  
@@ -972,10 +972,10 @@ index ac71677f4f..dac39484a5 100644
 +        pc = *(target_ulong*)const_args;
 +        break;
 +#endif // CANNOLI
-     case INDEX_op_exit_tb:
-         /* Reuse the zeroing that exists for goto_ptr.  */
-         if (a0 == 0) {
-@@ -2755,6 +2781,22 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+     case INDEX_op_goto_ptr:
+         /* jmp to the given host address (could be epilogue) */
+         tcg_out_modrm(s, OPC_GRP5, EXT5_JMPN_Ev, a0);
+@@ -2762,6 +2788,22 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
          tcg_out_ext16u(s, a0, a1);
          break;
  
@@ -998,7 +998,7 @@ index ac71677f4f..dac39484a5 100644
      case INDEX_op_qemu_ld_i32:
          tcg_out_qemu_ld(s, args, 0);
          break;
-@@ -2768,6 +2810,7 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+@@ -2775,6 +2817,7 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
      case INDEX_op_qemu_st_i64:
          tcg_out_qemu_st(s, args, 1);
          break;
@@ -1007,10 +1007,10 @@ index ac71677f4f..dac39484a5 100644
      OP_32_64(mulu2):
          tcg_out_modrm(s, OPC_GRP3_Ev + rexw, EXT3_MUL, args[3]);
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index dde9cd89b3..590d997d65 100644
+index 09b58b921b..5bf36442a0 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -4384,6 +4384,18 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4755,6 +4755,18 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
                      tcg_out8(s, shellcode[ii]);
                  }
              }
@@ -1030,20 +1030,20 @@ index dde9cd89b3..590d997d65 100644
              break;
          case INDEX_op_discard:
 -- 
-2.35.1
+2.39.1
 
 
-From 12a326038163894f51b0752cef7549b6fca392dc Mon Sep 17 00:00:00 2001
+From 55857c19093b17b2243633d35c32043bf62ec3bb Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sat, 14 May 2022 17:25:18 -0700
-Subject: [PATCH 04/13] Updated path
+Subject: [PATCH 04/14] Updated path
 
 ---
  include/tcg/tcg.h | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
-index 20dc3c68a1..a71cd470f8 100644
+index 9d0d14f635..34989fb401 100644
 --- a/include/tcg/tcg.h
 +++ b/include/tcg/tcg.h
 @@ -43,7 +43,7 @@
@@ -1056,13 +1056,13 @@ index 20dc3c68a1..a71cd470f8 100644
  /*
   * Defined in `linux-user/main.c`. Holds global cannoli state and callback
 -- 
-2.35.1
+2.39.1
 
 
-From 76a6dea911c1aa18a2bedf2e1699478f12959015 Mon Sep 17 00:00:00 2001
+From 6cd2ec65576de5e55507a30c47c7789cd5d42cee Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Thu, 19 May 2022 04:37:37 -0700
-Subject: [PATCH 05/13] Added --with-cannoli build flag
+Subject: [PATCH 05/14] Added --with-cannoli build flag
 
 ---
  configure         | 9 +++++++++
@@ -1070,27 +1070,27 @@ Subject: [PATCH 05/13] Added --with-cannoli build flag
  2 files changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/configure b/configure
-index 72ab03f11a..3ed66fc8cb 100755
+index 9e407ce2e3..18ba743e98 100755
 --- a/configure
 +++ b/configure
-@@ -313,6 +313,7 @@ plugins="$default_feature"
+@@ -285,6 +285,7 @@ coroutine=""
+ plugins="$default_feature"
  meson=""
- meson_args=""
  ninja=""
 +cannoli=""
  bindir="bin"
  skip_meson=no
  vfio_user_server="disabled"
-@@ -891,6 +892,8 @@ for opt do
+@@ -843,6 +844,8 @@ for opt do
    ;;
    --with-coroutine=*) coroutine="$optarg"
    ;;
 +  --with-cannoli=*) cannoli="$optarg"
 +  ;;
-   --disable-zlib-test)
+   --with-git=*) git="$optarg"
    ;;
-   --disable-virtio-blk-data-plane|--enable-virtio-blk-data-plane)
-@@ -1068,6 +1071,7 @@ Advanced options (experts only):
+   --with-git-submodules=*)
+@@ -1000,6 +1003,7 @@ Advanced options (experts only):
    --disable-werror         disable compilation abort on warning
    --disable-stack-protector disable compiler-provided stack protection
    --cpu=CPU                Build for host CPU [$cpu]
@@ -1098,7 +1098,7 @@ index 72ab03f11a..3ed66fc8cb 100755
    --with-coroutine=BACKEND coroutine backend. Supported options:
                             ucontext, sigaltstack, windows
    --enable-plugins
-@@ -2469,6 +2473,11 @@ if [ "$bsd" = "yes" ] ; then
+@@ -2338,6 +2342,11 @@ if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
  fi
  
@@ -1111,7 +1111,7 @@ index 72ab03f11a..3ed66fc8cb 100755
  
  if test "$have_asan_iface_fiber" = "yes" ; then
 diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
-index a71cd470f8..657dfefc92 100644
+index 34989fb401..addad049af 100644
 --- a/include/tcg/tcg.h
 +++ b/include/tcg/tcg.h
 @@ -41,9 +41,10 @@
@@ -1135,13 +1135,13 @@ index a71cd470f8..657dfefc92 100644
  
  /* XXX: make safe guess about sizes */
 -- 
-2.35.1
+2.39.1
 
 
-From 5346395f64cee6e81698ddf0aa7a36b58fe35eeb Mon Sep 17 00:00:00 2001
+From a920ea4281aac4cf0e3a121de83e941b11052442 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 29 May 2022 20:56:50 -0700
-Subject: [PATCH 06/13] Fixed cannoli PC for memory operations
+Subject: [PATCH 06/14] Fixed cannoli PC for memory operations
 
 ---
  tcg/i386/tcg-target.c.inc | 21 ++++++-----------
@@ -1149,11 +1149,11 @@ Subject: [PATCH 06/13] Fixed cannoli PC for memory operations
  2 files changed, 37 insertions(+), 31 deletions(-)
 
 diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
-index dac39484a5..82ea765c01 100644
+index 8fd9bc91fa..030f1557e4 100644
 --- a/tcg/i386/tcg-target.c.inc
 +++ b/tcg/i386/tcg-target.c.inc
-@@ -2476,9 +2476,16 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args, bool is64)
- #endif
+@@ -2513,9 +2513,16 @@ void tb_target_set_jmp_target(const TranslationBlock *tb, int n,
+     /* no need to flush icache explicitly */
  }
  
 +#ifdef CANNOLI
@@ -1169,7 +1169,7 @@ index dac39484a5..82ea765c01 100644
  {
      TCGArg a0, a1, a2;
      int c, const_a2, vexop, rexw = 0;
-@@ -2499,21 +2506,7 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
+@@ -2536,21 +2543,7 @@ static inline void tcg_out_op(TCGContext *s, TCGOpcode opc,
      a2 = args[2];
      const_a2 = const_args[2];
  
@@ -1188,17 +1188,17 @@ index dac39484a5..82ea765c01 100644
 -        pc = *(target_ulong*)const_args;
 -        break;
 -#endif // CANNOLI
-     case INDEX_op_exit_tb:
-         /* Reuse the zeroing that exists for goto_ptr.  */
-         if (a0 == 0) {
+     case INDEX_op_goto_ptr:
+         /* jmp to the given host address (could be epilogue) */
+         tcg_out_modrm(s, OPC_GRP5, EXT5_JMPN_Ev, a0);
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index 590d997d65..d9d035576a 100644
+index 5bf36442a0..812befd1af 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -107,9 +107,16 @@ static void tcg_out_ld(TCGContext *s, TCGType type, TCGReg ret, TCGReg arg1,
- static bool tcg_out_mov(TCGContext *s, TCGType type, TCGReg ret, TCGReg arg);
- static void tcg_out_movi(TCGContext *s, TCGType type,
+@@ -106,9 +106,16 @@ static void tcg_out_movi(TCGContext *s, TCGType type,
                           TCGReg ret, tcg_target_long arg);
+ static void tcg_out_exit_tb(TCGContext *s, uintptr_t arg);
+ static void tcg_out_goto_tb(TCGContext *s, int which);
 +#ifdef CANNOLI
 +static void tcg_out_op(TCGContext *s, TCGOpcode opc,
 +                       const TCGArg args[TCG_MAX_OP_ARGS],
@@ -1212,7 +1212,7 @@ index 590d997d65..d9d035576a 100644
  #if TCG_TARGET_MAYBE_vec
  static bool tcg_out_dup_vec(TCGContext *s, TCGType type, unsigned vece,
                              TCGReg dst, TCGReg src);
-@@ -3650,7 +3657,15 @@ static void tcg_reg_alloc_dup(TCGContext *s, const TCGOp *op)
+@@ -3892,7 +3899,15 @@ static void tcg_reg_alloc_dup(TCGContext *s, const TCGOp *op)
      }
  }
  
@@ -1228,7 +1228,7 @@ index 590d997d65..d9d035576a 100644
  {
      const TCGLifeData arg_life = op->life;
      const TCGOpDef * const def = &tcg_op_defs[op->opc];
-@@ -3817,7 +3832,12 @@ static void tcg_reg_alloc_op(TCGContext *s, const TCGOp *op)
+@@ -4201,7 +4216,12 @@ static void tcg_reg_alloc_op(TCGContext *s, const TCGOp *op)
          tcg_out_vec_op(s, op->opc, TCGOP_VECL(op), TCGOP_VECE(op),
                         new_args, const_args);
      } else {
@@ -1241,7 +1241,7 @@ index 590d997d65..d9d035576a 100644
      }
  
      /* move the outputs in the correct register if needed */
-@@ -4316,6 +4336,11 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4687,6 +4707,11 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
      s->pool_labels = NULL;
  #endif
  
@@ -1253,7 +1253,7 @@ index 590d997d65..d9d035576a 100644
      num_insns = -1;
      QTAILQ_FOREACH(op, &s->ops, link) {
          TCGOpcode opc = op->opc;
-@@ -4352,6 +4377,9 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4723,6 +4748,9 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
              }
  
  #ifdef CANNOLI
@@ -1263,7 +1263,7 @@ index 590d997d65..d9d035576a 100644
              /*
               * First `insn_start` variable is the PC of the instruction.
               * It may be encoded as 2 32-bit ints when emulating a
-@@ -4364,13 +4392,10 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4735,13 +4763,10 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
                  /* Should be large enough for any reasonable shellcode */
                  uint8_t shellcode[1024];
  
@@ -1278,7 +1278,7 @@ index 590d997d65..d9d035576a 100644
  
                  /* Make sure the SO library author is not being naughty ;) */
                  if(shellcode_size > sizeof(shellcode)) {
-@@ -4384,18 +4409,6 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4755,18 +4780,6 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
                      tcg_out8(s, shellcode[ii]);
                  }
              }
@@ -1297,7 +1297,7 @@ index 590d997d65..d9d035576a 100644
  #endif
              break;
          case INDEX_op_discard:
-@@ -4419,7 +4432,7 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4796,7 +4809,7 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
              /* Note: in order to speed up the code, it would be much
                 faster to have specialized register allocator functions for
                 some common argument patterns */
@@ -1305,25 +1305,25 @@ index 590d997d65..d9d035576a 100644
 +            tcg_reg_alloc_op(s, op, cannoli_pc);
              break;
          }
- #ifdef CONFIG_DEBUG_TCG
+         /* Test for (pending) buffer overflow.  The assumption is that any
 -- 
-2.35.1
+2.39.1
 
 
-From 783863fa64c87475fb466ae0db5131bff21793cb Mon Sep 17 00:00:00 2001
+From 128fb29e9b13d67767bc8183de0c8f08995dc691 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 00:30:14 -0700
-Subject: [PATCH 07/13] Wrap code in cannoli as needed
+Subject: [PATCH 07/14] Wrap code in cannoli as needed
 
 ---
  tcg/tcg.c | 4 ++++
  1 file changed, 4 insertions(+)
 
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index d9d035576a..8c508de957 100644
+index 812befd1af..c02f6e602d 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -4432,7 +4432,11 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4809,7 +4809,11 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
              /* Note: in order to speed up the code, it would be much
                 faster to have specialized register allocator functions for
                 some common argument patterns */
@@ -1334,15 +1334,15 @@ index d9d035576a..8c508de957 100644
 +#endif
              break;
          }
- #ifdef CONFIG_DEBUG_TCG
+         /* Test for (pending) buffer overflow.  The assumption is that any
 -- 
-2.35.1
+2.39.1
 
 
-From 7362d43859a95dd1d19b27e6f527599e24a48c7b Mon Sep 17 00:00:00 2001
+From 72dd745e4d3642bb2df40b50d1a09376c20bbffe Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Mon, 30 May 2022 06:05:07 -0700
-Subject: [PATCH 08/13] Fixed cannoli not flushing on longjmps and signals
+Subject: [PATCH 08/14] Fixed cannoli not flushing on longjmps and signals
 
 ---
  accel/tcg/cpu-exec-common.c | 16 ++++++++++++++++
@@ -1372,7 +1372,7 @@ Subject: [PATCH 08/13] Fixed cannoli not flushing on longjmps and signals
  24 files changed, 212 insertions(+)
 
 diff --git a/accel/tcg/cpu-exec-common.c b/accel/tcg/cpu-exec-common.c
-index be6fe45aa5..e74228fb5b 100644
+index c7bc8c6efa..c8ad7fa5ec 100644
 --- a/accel/tcg/cpu-exec-common.c
 +++ b/accel/tcg/cpu-exec-common.c
 @@ -22,6 +22,12 @@
@@ -1406,10 +1406,10 @@ index be6fe45aa5..e74228fb5b 100644
      cpu->can_do_io = 1;
      siglongjmp(cpu->jmp_env, 1);
 diff --git a/accel/tcg/cpu-exec.c b/accel/tcg/cpu-exec.c
-index a565a3f8ec..5df18c2bc8 100644
+index 04cd1f3092..ed293304fe 100644
 --- a/accel/tcg/cpu-exec.c
 +++ b/accel/tcg/cpu-exec.c
-@@ -352,6 +352,11 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
+@@ -430,6 +430,11 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
      TranslationBlock *last_tb;
      const void *tb_ptr = itb->tc.ptr;
  
@@ -1418,11 +1418,11 @@ index a565a3f8ec..5df18c2bc8 100644
 +    env->cannoli_r12 = CANNOLI_POISON;
 +#endif
 +
-     log_cpu_exec(itb->pc, cpu, itb);
- 
-     qemu_thread_jit_execute();
+     if (qemu_loglevel_mask(CPU_LOG_TB_CPU | CPU_LOG_EXEC)) {
+         log_cpu_exec(log_pc(cpu, itb), cpu, itb);
+     }
 diff --git a/linux-user/signal.c b/linux-user/signal.c
-index 8d29bfaa6b..09ad99e384 100644
+index 098f3a787d..516da80460 100644
 --- a/linux-user/signal.c
 +++ b/linux-user/signal.c
 @@ -33,6 +33,12 @@
@@ -1438,7 +1438,7 @@ index 8d29bfaa6b..09ad99e384 100644
  static struct target_sigaction sigact_table[TARGET_NSIG];
  
  static void host_signal_handler(int host_signum, siginfo_t *info,
-@@ -823,6 +829,13 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+@@ -794,6 +800,13 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
      bool sync_sig = false;
      void *sigmask = host_signal_mask(uc);
  
@@ -1452,7 +1452,7 @@ index 8d29bfaa6b..09ad99e384 100644
      /*
       * Non-spoofed SIGSEGV and SIGBUS are synchronous, and need special
       * handling wrt signal blocking and unwinding.
-@@ -852,6 +865,10 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+@@ -823,6 +836,10 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
                  /* If this was a write to a TB protected page, restart. */
                  if (is_write &&
                      handle_sigsegv_accerr_write(cpu, sigmask, pc, guest_addr)) {
@@ -1463,7 +1463,7 @@ index 8d29bfaa6b..09ad99e384 100644
                      return;
                  }
  
-@@ -881,6 +898,10 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+@@ -852,6 +869,10 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
      /* get target signal number */
      guest_sig = host_to_target_signal(host_sig);
      if (guest_sig < 1 || guest_sig > TARGET_NSIG) {
@@ -1474,7 +1474,7 @@ index 8d29bfaa6b..09ad99e384 100644
          return;
      }
      trace_user_host_signal(env, host_sig, guest_sig);
-@@ -922,6 +943,11 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
+@@ -893,6 +914,11 @@ static void host_signal_handler(int host_sig, siginfo_t *info, void *puc)
  
      /* interrupt the virtual CPU as soon as possible */
      cpu_exit(thread_cpu);
@@ -1505,10 +1505,10 @@ index d0abc949a8..f54fb0f15f 100644
  
  /**
 diff --git a/target/arm/cpu.h b/target/arm/cpu.h
-index 5168e3d837..a0cddac191 100644
+index 8cf70693be..d58d16346c 100644
 --- a/target/arm/cpu.h
 +++ b/target/arm/cpu.h
-@@ -761,6 +761,13 @@ typedef struct CPUArchState {
+@@ -771,6 +771,13 @@ typedef struct CPUArchState {
      /* Linux syscall tagged address support */
      bool tagged_addr_enable;
  #endif
@@ -1523,7 +1523,7 @@ index 5168e3d837..a0cddac191 100644
  
  static inline void set_feature(CPUARMState *env, int feature)
 diff --git a/target/avr/cpu.h b/target/avr/cpu.h
-index 96419c0c2b..59daaa144f 100644
+index f19dd72926..3e5744bfcd 100644
 --- a/target/avr/cpu.h
 +++ b/target/avr/cpu.h
 @@ -135,6 +135,13 @@ typedef struct CPUArchState {
@@ -1559,7 +1559,7 @@ index e6776f25b1..d3dbd56701 100644
  
  /**
 diff --git a/target/hexagon/cpu.h b/target/hexagon/cpu.h
-index 2a65a57bab..b20f9ebcc6 100644
+index 34c0ae0a67..dfcd2c6603 100644
 --- a/target/hexagon/cpu.h
 +++ b/target/hexagon/cpu.h
 @@ -128,6 +128,13 @@ typedef struct CPUArchState {
@@ -1595,10 +1595,10 @@ index 6f3b6beecf..3d8a6e599c 100644
  
  /**
 diff --git a/target/i386/cpu.h b/target/i386/cpu.h
-index 82004b65b9..22e6e7d9c0 100644
+index d4bc19577a..abbd75ec20 100644
 --- a/target/i386/cpu.h
 +++ b/target/i386/cpu.h
-@@ -1775,6 +1775,13 @@ typedef struct CPUArchState {
+@@ -1811,6 +1811,13 @@ typedef struct CPUArchState {
      TPRAccess tpr_access_type;
  
      unsigned nr_dies;
@@ -1613,7 +1613,7 @@ index 82004b65b9..22e6e7d9c0 100644
  
  struct kvm_msrs;
 diff --git a/target/m68k/cpu.h b/target/m68k/cpu.h
-index 4d8f48e8c7..0eff99a80d 100644
+index 3a9cfe2f33..50d5d39ae4 100644
 --- a/target/m68k/cpu.h
 +++ b/target/m68k/cpu.h
 @@ -155,6 +155,13 @@ typedef struct CPUArchState {
@@ -1649,7 +1649,7 @@ index 1e84dd8f47..ea21031cb2 100644
  
  /*
 diff --git a/target/mips/cpu.h b/target/mips/cpu.h
-index 0a085643a3..f7d202cb66 100644
+index caf2b06911..1671b5e62b 100644
 --- a/target/mips/cpu.h
 +++ b/target/mips/cpu.h
 @@ -1161,6 +1161,13 @@ typedef struct CPUArchState {
@@ -1667,7 +1667,7 @@ index 0a085643a3..f7d202cb66 100644
  
  /**
 diff --git a/target/nios2/cpu.h b/target/nios2/cpu.h
-index f85581ee56..a60954cc16 100644
+index b1a5549074..e3a72be77e 100644
 --- a/target/nios2/cpu.h
 +++ b/target/nios2/cpu.h
 @@ -200,6 +200,13 @@ struct CPUArchState {
@@ -1685,10 +1685,10 @@ index f85581ee56..a60954cc16 100644
  
  typedef struct {
 diff --git a/target/openrisc/cpu.h b/target/openrisc/cpu.h
-index b9584f10d4..355084f27f 100644
+index 5f60749705..a63f25baac 100644
 --- a/target/openrisc/cpu.h
 +++ b/target/openrisc/cpu.h
-@@ -290,6 +290,13 @@ typedef struct CPUArchState {
+@@ -292,6 +292,13 @@ typedef struct CPUArchState {
      uint32_t picmr;         /* Interrupt mask register */
      uint32_t picsr;         /* Interrupt contrl register*/
  #endif
@@ -1703,10 +1703,10 @@ index b9584f10d4..355084f27f 100644
  
  /**
 diff --git a/target/ppc/cpu.h b/target/ppc/cpu.h
-index a4c893cfad..48b84165c5 100644
+index 3923f174f8..0eae080ac3 100644
 --- a/target/ppc/cpu.h
 +++ b/target/ppc/cpu.h
-@@ -1248,6 +1248,13 @@ struct CPUArchState {
+@@ -1265,6 +1265,13 @@ struct CPUArchState {
       * running cycles.
       */
      uint64_t pmu_base_time;
@@ -1721,10 +1721,10 @@ index a4c893cfad..48b84165c5 100644
  
  #define SET_FIT_PERIOD(a_, b_, c_, d_)          \
 diff --git a/target/riscv/cpu.h b/target/riscv/cpu.h
-index 5c7acc055a..e6aef370f5 100644
+index bcf0826753..a2825d3251 100644
 --- a/target/riscv/cpu.h
 +++ b/target/riscv/cpu.h
-@@ -369,6 +369,13 @@ struct CPUArchState {
+@@ -394,6 +394,13 @@ struct CPUArchState {
      uint64_t kvm_timer_compare;
      uint64_t kvm_timer_state;
      uint64_t kvm_timer_frequency;
@@ -1774,10 +1774,10 @@ index 7d6d01325b..512c69bd03 100644
  
  static inline uint64_t *get_freg(CPUS390XState *cs, int nr)
 diff --git a/target/sh4/cpu.h b/target/sh4/cpu.h
-index 9f15ef913c..17a6d7fd01 100644
+index 727b829598..1e3d0aad89 100644
 --- a/target/sh4/cpu.h
 +++ b/target/sh4/cpu.h
-@@ -188,6 +188,13 @@ typedef struct CPUArchState {
+@@ -195,6 +195,13 @@ typedef struct CPUArchState {
      int in_sleep;		/* SR_BL ignored during sleep */
      memory_content *movcal_backup;
      memory_content **movcal_backup_tail;
@@ -1792,7 +1792,7 @@ index 9f15ef913c..17a6d7fd01 100644
  
  /**
 diff --git a/target/sparc/cpu.h b/target/sparc/cpu.h
-index f80ea2e8cf..380c740282 100644
+index e478c5eb16..6a59a73b53 100644
 --- a/target/sparc/cpu.h
 +++ b/target/sparc/cpu.h
 @@ -549,6 +549,13 @@ struct CPUArchState {
@@ -1846,10 +1846,10 @@ index 579adcb769..da4af8d732 100644
  
  /**
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index 8c508de957..6d2de178e9 100644
+index c02f6e602d..9e8b22beb6 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -4063,6 +4063,20 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
+@@ -4433,6 +4433,20 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
          save_globals(s, allocated_regs);
      }
  
@@ -1867,13 +1867,13 @@ index 8c508de957..6d2de178e9 100644
 +            offsetof(CPUArchState, cannoli_r14));
 +#endif
 +
- #ifdef CONFIG_TCG_INTERPRETER
-     {
-         gpointer hash = (gpointer)(uintptr_t)info->typemask;
-@@ -4074,6 +4088,18 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
-     tcg_out_call(s, func_addr);
- #endif
+     tcg_out_call(s, tcg_call_func(op), info);
  
+     /* Assign output registers and emit moves if needed.  */
+@@ -4452,6 +4466,18 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
+     default:
+         g_assert_not_reached();
+     }
 +#ifdef CANNOLI
 +    /* Poison the current C-side cannoli register state as we're about to
 +     * track them in registers.
@@ -1886,27 +1886,27 @@ index 8c508de957..6d2de178e9 100644
 +            offsetof(CPUArchState, cannoli_r12));
 +#endif
 +
-     /* assign output registers and emit moves if needed */
-     for(i = 0; i < nb_oargs; i++) {
-         arg = op->args[i];
+ 
+     /* Flush or discard output registers as needed. */
+     for (i = 0; i < nb_oargs; i++) {
 -- 
-2.35.1
+2.39.1
 
 
-From a3825cad6c6f1ef014ba98f96000b1027ebc6b0a Mon Sep 17 00:00:00 2001
+From bf051f2ed4c1449b6d3e6e71bd00195eac3157e2 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Tue, 31 May 2022 03:03:13 -0700
-Subject: [PATCH 09/13] Pass endian and arch information to cannoli
+Subject: [PATCH 09/14] Pass endian and arch information to cannoli
 
 ---
  linux-user/main.c | 5 +++--
  1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 06e7f0fbbc..472233097e 100644
+index 1ebb10cb97..060a09b3f8 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -294,7 +294,8 @@ static void handle_arg_cannoli(const char *arg)
+@@ -301,7 +301,8 @@ static void handle_arg_cannoli(const char *arg)
      }
  
      /* Get the entry point for Cannoli */
@@ -1916,7 +1916,7 @@ index 06e7f0fbbc..472233097e 100644
      if(!query_version) {
          fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
              dlerror());
-@@ -302,7 +303,7 @@ static void handle_arg_cannoli(const char *arg)
+@@ -309,7 +310,7 @@ static void handle_arg_cannoli(const char *arg)
      }
  
      /* Query binding information */
@@ -1926,23 +1926,23 @@ index 06e7f0fbbc..472233097e 100644
      /* Check version */
      if(cannoli->version != CANNOLI_VERSION) {
 -- 
-2.35.1
+2.39.1
 
 
-From 48446438d6894f9538f8368ed20055366a9e60ab Mon Sep 17 00:00:00 2001
+From e40ad6157c92f56e1887d1925e9a0fe15104991a Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 13 Jul 2022 13:58:58 -0700
-Subject: [PATCH 10/13] Added loongarch support
+Subject: [PATCH 10/14] Added loongarch support
 
 ---
  target/loongarch/cpu.h | 7 +++++++
  1 file changed, 7 insertions(+)
 
 diff --git a/target/loongarch/cpu.h b/target/loongarch/cpu.h
-index a36349df83..c01017ed97 100644
+index e35cf65597..c7c737ee0a 100644
 --- a/target/loongarch/cpu.h
 +++ b/target/loongarch/cpu.h
-@@ -310,6 +310,13 @@ typedef struct CPUArchState {
+@@ -327,6 +327,13 @@ typedef struct CPUArchState {
      bool load_elf;
      uint64_t elf_address;
  #endif
@@ -1957,13 +1957,13 @@ index a36349df83..c01017ed97 100644
  
  /**
 -- 
-2.35.1
+2.39.1
 
 
-From 165e60bb823c3bfc1bcf817a6dc2e3df348b794e Mon Sep 17 00:00:00 2001
+From 572ded946755458e2268d64ad69ce07f8bcbec7c Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Wed, 13 Jul 2022 19:03:29 -0700
-Subject: [PATCH 11/13] Added mmap hooks
+Subject: [PATCH 11/14] Added mmap hooks
 
 ---
  include/tcg/tcg.h |  2 +-
@@ -1971,7 +1971,7 @@ Subject: [PATCH 11/13] Added mmap hooks
  2 files changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/include/tcg/tcg.h b/include/tcg/tcg.h
-index 657dfefc92..30a56e5f8d 100644
+index addad049af..e99c43a80a 100644
 --- a/include/tcg/tcg.h
 +++ b/include/tcg/tcg.h
 @@ -44,7 +44,7 @@
@@ -1984,12 +1984,12 @@ index 657dfefc92..30a56e5f8d 100644
  /*
   * Defined in `linux-user/main.c`. Holds global cannoli state and callback
 diff --git a/linux-user/mmap.c b/linux-user/mmap.c
-index 4e7a6be6ee..5389fb46f0 100644
+index 10f5079331..c60adc3c63 100644
 --- a/linux-user/mmap.c
 +++ b/linux-user/mmap.c
-@@ -23,6 +23,11 @@
- #include "user-internals.h"
+@@ -24,6 +24,11 @@
  #include "user-mmap.h"
+ #include "target_mman.h"
  
 +#ifdef CONFIG_CANNOLI
 +/* Pull in TCG header that has cannoli */
@@ -1999,9 +1999,9 @@ index 4e7a6be6ee..5389fb46f0 100644
  static pthread_mutex_t mmap_mutex = PTHREAD_MUTEX_INITIALIZER;
  static __thread int mmap_lock_count;
  
-@@ -628,6 +633,29 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int target_prot,
-     page_flags |= PAGE_RESET;
-     page_set_flags(start, start + len, page_flags);
+@@ -652,6 +657,29 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int target_prot,
+         }
+     }
   the_end:
 +#ifdef CONFIG_CANNOLI
 +    if(cannoli && cannoli->mmap) {
@@ -2029,7 +2029,7 @@ index 4e7a6be6ee..5389fb46f0 100644
      trace_target_mmap_complete(start);
      if (qemu_loglevel_mask(CPU_LOG_PAGE)) {
          FILE *f = qemu_log_trylock();
-@@ -693,6 +721,13 @@ int target_munmap(abi_ulong start, abi_ulong len)
+@@ -716,6 +744,13 @@ int target_munmap(abi_ulong start, abi_ulong len)
  
      trace_target_munmap(start, len);
  
@@ -2044,23 +2044,23 @@ index 4e7a6be6ee..5389fb46f0 100644
          return -TARGET_EINVAL;
      len = TARGET_PAGE_ALIGN(len);
 -- 
-2.35.1
+2.39.1
 
 
-From 6d3bf0753b0293bf8f51ade42364f15cd438749a Mon Sep 17 00:00:00 2001
+From 4f909fa37c96237f4405a3c42bbbc2d813a6bd45 Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Fri, 29 Jul 2022 18:11:59 -0700
-Subject: [PATCH 12/13] Add register patches
+Subject: [PATCH 12/14] Add register patches
 
 ---
  linux-user/main.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++-
  1 file changed, 93 insertions(+), 2 deletions(-)
 
 diff --git a/linux-user/main.c b/linux-user/main.c
-index 472233097e..5bb0a386cc 100644
+index 060a09b3f8..7d4e67f66b 100644
 --- a/linux-user/main.c
 +++ b/linux-user/main.c
-@@ -294,7 +294,7 @@ static void handle_arg_cannoli(const char *arg)
+@@ -301,7 +301,7 @@ static void handle_arg_cannoli(const char *arg)
      }
  
      /* Get the entry point for Cannoli */
@@ -2069,7 +2069,7 @@ index 472233097e..5bb0a386cc 100644
          dlsym(cannoli_lib, CANNOLI_ENTRY);
      if(!query_version) {
          fprintf(stderr, "Cannoli: Failed to get entry point \"%s\"\n",
-@@ -302,8 +302,99 @@ static void handle_arg_cannoli(const char *arg)
+@@ -309,8 +309,99 @@ static void handle_arg_cannoli(const char *arg)
          exit(EXIT_FAILURE);
      }
  
@@ -2171,23 +2171,23 @@ index 472233097e..5bb0a386cc 100644
      /* Check version */
      if(cannoli->version != CANNOLI_VERSION) {
 -- 
-2.35.1
+2.39.1
 
 
-From e612c4aecd20038a49d7029c7529ae08c9947841 Mon Sep 17 00:00:00 2001
+From 05913bff4e6f5f042f474be492985a0079c22a7e Mon Sep 17 00:00:00 2001
 From: Brandon Falk <bfalk@gamozolabs.com>
 Date: Sun, 7 Aug 2022 10:32:01 -0700
-Subject: [PATCH 13/13] Added branch support for cannoli
+Subject: [PATCH 13/14] Added branch support for cannoli
 
 ---
  tcg/tcg.c | 30 +++++++++++++++++++++++++++++-
  1 file changed, 29 insertions(+), 1 deletion(-)
 
 diff --git a/tcg/tcg.c b/tcg/tcg.c
-index 6d2de178e9..73fbd2c48a 100644
+index 9e8b22beb6..4021981e36 100644
 --- a/tcg/tcg.c
 +++ b/tcg/tcg.c
-@@ -4415,13 +4415,41 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb)
+@@ -4786,13 +4786,41 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, target_ulong pc_start)
               * access the `gen_insn_data` ourselves
               */
              if(cannoli && cannoli->lift_instruction) {
@@ -2231,5 +2231,41 @@ index 6d2de178e9..73fbd2c48a 100644
                  /* Make sure the SO library author is not being naughty ;) */
                  if(shellcode_size > sizeof(shellcode)) {
 -- 
-2.35.1
+2.39.1
+
+
+From 7b76bcdf4646147af6b1d2e8db6e29ab752e8f91 Mon Sep 17 00:00:00 2001
+From: Brandon Falk <bfalk@gamozolabs.com>
+Date: Mon, 23 Jan 2023 13:28:55 -0800
+Subject: [PATCH 14/14] Updated to latest QEMU
+ 00b1faea41d283e931256aa78aa975a369ec3ae6
+
+---
+ tcg/i386/tcg-target.c.inc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/tcg/i386/tcg-target.c.inc b/tcg/i386/tcg-target.c.inc
+index 030f1557e4..87b5c8f097 100644
+--- a/tcg/i386/tcg-target.c.inc
++++ b/tcg/i386/tcg-target.c.inc
+@@ -4234,7 +4234,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+         tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RDI, TCG_REG_RSP);
+ 
+         /* Invoke the JIT entry callback */
+-        tcg_out_call(s, (void*)cannoli->jit_entry);
++        tcg_out_call(s, (void*)cannoli->jit_entry, NULL);
+ 
+         /*
+          * Load the temporary values returned from `jit_entry`. These are the
+@@ -4341,7 +4341,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
+         tcg_out_mov(s, TCG_TYPE_PTR, TCG_REG_RDX, TCG_REG_R14);
+ 
+         /* Invoke the callback! */
+-        tcg_out_call(s, (void*)cannoli->jit_exit);
++        tcg_out_call(s, (void*)cannoli->jit_exit, NULL);
+ 
+         /* Restore the stack */
+         tcg_out_pop(s, TCG_REG_R11);
+-- 
+2.39.1
 
