@@ -44,8 +44,7 @@ workdir ${QEMU_DIR}
 run ./configure \
         --target-list=${TARGET_LIST} \
         --extra-ldflags="-ldl" \
-        --with-cannoli=${CANNOLI_DIR} \
-        --static && \
+        --with-cannoli=${CANNOLI_DIR} && \
     make -j $(nproc)
 
 # Rename the resulting qemu bins
@@ -56,26 +55,34 @@ run for x in $(\
             -type f \
             -exec file {} \; | \
         grep -oP '(^.*)(?=: ELF)' \
-    ); do cp $x "$x-static"; done
+    ); do cp $x "$x-patch"; done
 
 
 # =================== STAGE 1 =================== 
 # Start a new container without all the qemu cruft for cannoli
 from ubuntu:20.04
 
+# Get cannoli build deps
 run apt update && \
     apt install -y \
         curl \
         build-essential \
         clang
 
+# Install rust
+run curl https://sh.rustup.rs -sSf | \
+    sh -s -- --default-toolchain nightly --profile minimal -y
+
 # Copy in the previously built qemu files
 env QEMU_DIR=/build/qemu
 workdir ${QEMU_DIR}
-copy --from=0 ${QEMU_DIR}/build/qemu-*-static ./
+copy --from=0 ${QEMU_DIR}/build/qemu-*-patch ./
 
-# Install rust
-run curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
+# And their libraries
+workdir /lib/
+copy --from=0 /lib/x86_64-linux-gnu/libcapstone.so.3 .
+copy --from=0 /lib/x86_64-linux-gnu/libgmodule-2.0.so.0 .
+copy --from=0 /lib/x86_64-linux-gnu/libglib-2.0.so.0 .
 
 # Build cannoli
 env CANNOLI_DIR=/build/cannoli
