@@ -193,6 +193,38 @@ impl Architecture {
             _ => panic!("Cannoli: Unhandled architecture name {}", arch),
         }
     }
+
+    pub fn bitness(&self) -> u8 {
+        match self {
+            Architecture::Aarch64     => 64,
+            Architecture::Aarch64be   => 64,
+            Architecture::Alpha       => 32,
+            Architecture::Armv5teb    => 64,
+            Architecture::Armv5tel    => 64,
+            Architecture::Cris        => 32,
+            Architecture::Hexagon     => 32,
+            Architecture::I386        => 32,
+            Architecture::I686        => 32,
+            Architecture::M68k        => 32,
+            Architecture::Microblaze  => 32,
+            Architecture::Mips        => 32,
+            Architecture::Mips64      => 64,
+            Architecture::Nios2       => 32,
+            Architecture::Openrisc    => 32,
+            Architecture::Parisc      => 32,
+            Architecture::Ppc         => 32,
+            Architecture::Ppc64       => 64,
+            Architecture::Ppc64le     => 64,
+            Architecture::Riscv32     => 32,
+            Architecture::Riscv64     => 64,
+            Architecture::S390x       => 32,
+            Architecture::Sh4         => 32,
+            Architecture::Sparc       => 32,
+            Architecture::Sparc64     => 64,
+            Architecture::X86_64      => 64,
+            Architecture::Xtensa      => 32,
+        }
+    }
 }
 
 /// Gross macro to deserialize multiple plain-old-data types into a tuple
@@ -385,7 +417,22 @@ fn parse_payload<T: Cannoli>(pid: &T::PidContext, tid: &T::TidContext,
                 T::write(pid, tid, pc as u64, addr as u64,
                     val as u64, 8, trace)
             },
-
+            0x40 => { // Branch32
+                let size = consume!(payload, u32).0;
+                let pc   = consume!(payload, u32).0 as u64;
+                let branch = consume!(payload, u8).0 != 0;
+                let regs = &payload[..size as usize];
+                payload = &payload[size as usize..];
+                T::branch(pid, tid, pc, branch, regs, trace)
+            },
+            0xc0 => { // Branch64
+                let size = consume!(payload, u32).0;
+                let pc   = consume!(payload, u64).0;
+                let branch = consume!(payload, u8).0 != 0;
+                let regs = &payload[..size as usize];
+                payload = &payload[size as usize..];
+                T::branch(pid, tid, pc, branch, regs, trace)
+            },
             _ => {
                 // Invalid opcode
                 return Err(Error::InvalidOpcode(op));
@@ -770,6 +817,26 @@ pub trait Cannoli: Send + Sync {
     fn regs(_pid: &Self::PidContext, _tid: &Self::TidContext,
             _pc: u64, _regs: &[u8],
             _trace: &mut Vec<Self::Trace>) {}
+
+    /// Invoked when execution of an instruction with branch tracing occurs
+    ///
+    /// Executed on multiple threads
+    ///
+    /// This is a high-performance parallel callback, and is a prime location
+    /// for adding code if you need to do processing unrelated to the flow of
+    /// a trace itself. For example, symbolizing a trace makes the most sense
+    /// here as it doesn't care about the instructions around it. Think of this
+    /// like a `filter_map` where it applies a transformation in parallel,
+    /// and potentially removing information from the trace
+    ///
+    /// Part of the parallel phase of trace processing. Since multiple threads
+    /// are processing traces, the order of the events are not stable. This
+    /// function is only meant to reason about `pc` in isolation, not with
+    /// respect to previous operations.
+    fn branch(_pid: &Self::PidContext, _tid: &Self::TidContext,
+            _pc: u64, _branch: bool, _regs: &[u8],
+            _trace: &mut Vec<Self::Trace>) {}
+
 
     /// Invoked when a memory load was lifted from the trace with a given
     /// access size in bytes
