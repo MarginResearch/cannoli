@@ -59,6 +59,11 @@ pub enum HookType {
     /// GPR state for the target architecture
     Register,
 
+    /// Hook fires every time an instruction is hit, and reports PC, a bool
+    /// indicating if the instruction is a branch, and the GPR state for the
+    /// target architecture
+    Branch,
+
     /// Don't hook at all
     Never,
 }
@@ -350,6 +355,32 @@ unsafe extern fn $lift(pc: $tusize, bb_end: i32,
                 core::ptr::addr_of!(cannoli_reghook64_end) as usize,
             )
         }
+        (32, HookType::Branch) => {
+            if bb_end != 0 {
+                (
+                    core::ptr::addr_of!(cannoli_branchhook132)     as usize,
+                    core::ptr::addr_of!(cannoli_branchhook132_end) as usize,
+                )
+            } else {
+                (
+                    core::ptr::addr_of!(cannoli_branchhook032)     as usize,
+                    core::ptr::addr_of!(cannoli_branchhook032_end) as usize,
+                )
+            }
+        }
+        (64, HookType::Branch) => {
+            if bb_end != 0 {
+                (
+                    core::ptr::addr_of!(cannoli_branchhook164)     as usize,
+                    core::ptr::addr_of!(cannoli_branchhook164_end) as usize,
+                )
+            } else {
+                (
+                    core::ptr::addr_of!(cannoli_branchhook064)     as usize,
+                    core::ptr::addr_of!(cannoli_branchhook064_end) as usize,
+                )
+            }
+        }
         (_, HookType::Never) => {
             // Don't hook at all
             return 0;
@@ -385,7 +416,7 @@ unsafe extern fn $lift(pc: $tusize, bb_end: i32,
         ($flush as usize).to_le_bytes());
 
     // Register hooks have extra patches
-    if matches!(hook_type, HookType::Register) {
+    if matches!(hook_type, HookType::Register) || matches!(hook_type, HookType::Branch) {
         // Patch register hook size and offset
         patch(tmp, REPLACE_WITH_REGHOOK_OFFSET.to_le_bytes(),
             (REGISTER_OFFSET.load(Ordering::Relaxed) as u32).to_le_bytes());
@@ -728,6 +759,14 @@ extern {
     static cannoli_reghook32_end:       u8;
     static cannoli_reghook64:           u8;
     static cannoli_reghook64_end:       u8;
+    static cannoli_branchhook132:       u8;
+    static cannoli_branchhook132_end:   u8;
+    static cannoli_branchhook032:       u8;
+    static cannoli_branchhook032_end:   u8;
+    static cannoli_branchhook164:       u8;
+    static cannoli_branchhook164_end:   u8;
+    static cannoli_branchhook064:       u8;
+    static cannoli_branchhook064_end:   u8;
 }
 
 /// Magic value to replace with the address of the respective `flush_buffer`
@@ -978,6 +1017,87 @@ cannoli_reghook\bits\()_end:
 
 create_reghook 32, 4
 create_reghook 64, 8
+
+// Macro invoked when creating an true branch hook.
+//
+// bits  - The bitness of the emulated target, either 32 or 64
+// width - The bitness divided by eight (number of bytes per target usize)
+// branch - Bool indicating if this is a branch or not
+.macro create_branchhook bits, width, is_branch
+
+.global cannoli_branchhook\is_branch\()\bits\()
+cannoli_branchhook\is_branch\()\bits\():
+    // Determine size required for register hook metadata
+    // One more byte required (versus reghook) for branch boolean
+    lea r14, [r12 + 1 + 4 + \width + 1]
+    add r14, {REPLACE_WITH_REGHOOK_SIZE}
+
+    // Make sure we're in bounds
+    cmp r14, r13
+    jbe 2f
+
+    // We're out of space! This happens "rarely", only when the buffer is full,
+    // so we can do much more complex work here. We can also save and restore
+    // some registers.
+    //
+    // We directly call into our Rust to reduce the icache pollution and to get
+    // some code sharing for the much more complex flushing operation
+    //
+    // Flushing gets us a new r12, r13, and r14
+    mov  r13, {REPLACE_WITH_FLUSH}
+    call r13
+
+2:
+.if \bits == 32
+    // Opcode
+    mov byte ptr [r12], 0x40
+
+    // Size of payload
+    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
+
+    // PC, directly put into memory from an immediate
+    mov dword ptr [r12 + 1 + 4], {REPLACE_WITH_PC}
+    mov byte ptr [r12 + 1 + 4 + \width], \is_branch
+.elseif \bits == 64
+    // Opcode
+    mov byte ptr [r12], 0xc0
+
+    // Size of payload
+    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
+
+    // Move PC into a register so we can use imm64 encoding
+    mov r14, {REPLACE_WITH_PC}
+    mov qword ptr [r12 + 1 + 4], r14
+    mov byte ptr [r12 + 1 + 4 + \width], \is_branch
+.else
+.error "Invalid bitness passed to cannoli_branchhook"
+.endif
+
+    // Fill in the registers
+    push rdi
+    push rsi
+    push rcx
+    lea rdi, [r12 + \width + 1 + 4 + 1]
+    lea rsi, [rbp + {REPLACE_WITH_REGHOOK_OFFSET}]
+    mov ecx, {REPLACE_WITH_REGHOOK_SIZE}
+    rep movsb
+    pop rcx
+    pop rsi
+    pop rdi
+
+    // Advance buffer
+    add r12, \width + 1 + 4 + 1
+    add r12, {REPLACE_WITH_REGHOOK_SIZE}
+
+.global cannoli_branchhook\is_branch\()\bits\()_end
+cannoli_branchhook\is_branch\()\bits\()_end:
+
+.endm // create_branchhook
+
+create_branchhook 32, 4, 1
+create_branchhook 32, 4, 0
+create_branchhook 64, 8, 1
+create_branchhook 64, 8, 0
 
 // ===========================================================================
 // !!! WARNING !!!
