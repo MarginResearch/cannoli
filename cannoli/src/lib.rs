@@ -527,7 +527,7 @@ fn handle_client<T>(
     let pid_context = any_pid_context.downcast_ref::<T::PidContext>().unwrap();
 
     // Create a new instance of the user's structure
-    let (user_type, user_ctxt) = T::init_tid(&*pid_context, ci);
+    let (user_type, user_ctxt) = T::init_tid(pid_context, ci);
     let user_ctxt = &user_ctxt;
 
     // Create the sequencing state machine
@@ -582,8 +582,8 @@ fn handle_client<T>(
                         // there was one
                         let (new_ticket, payload) = pipe.try_recv(
                             ticket.take().unwrap(),
-                            |x| parse_payload::<T>(
-                                &*pid_context, user_ctxt, &mut trace, x));
+                            |x| parse_payload::<T>(pid_context, user_ctxt, &mut trace, x),
+                        );
 
                         // Replace the ticket with the new ticket
                         ticket = Some(new_ticket);
@@ -629,8 +629,7 @@ fn handle_client<T>(
                                 let trace = state.traces.remove(0).1;
 
                                 // Report the trace
-                                state.user.trace(&*pid_context,
-                                    user_ctxt, &trace);
+                                state.user.trace(pid_context, user_ctxt, &trace);
                             }
 
                             // Drop the lock and re-allocate the trace buffer
