@@ -1,0 +1,5 @@
+[toolchain]
+channel = "nightly-2023-05-12"
+profile = "default"
+components = [ "rust-src", "rust-analyzer" ]
+targets = []

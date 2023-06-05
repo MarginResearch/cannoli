@@ -1,6 +1,6 @@
 //! An example user of Cannoli which symbolizes a trace
 
-#![feature(once_cell)]
+#![feature(lazy_cell)]
 
 use std::sync::{Mutex, LazyLock, Arc};
 use std::process::Command;
