@@ -118,7 +118,7 @@ otherwise get will full tracing.
    implementing the `Cannoli` trait (see one of the `examples`)
 2. Create a library using the `jitter` library to filter JIT hooks by
    implementing `hook_inst` and `hook_mem`, this must be a `cdylib` that
-   produces the `.so` that you pass into QEMU with `--cannoli`. For a basic
+   produces the `.so` that you pass into QEMU with `-cannoli`. For a basic
    example of this that hooks everything, see `jitter_always`
 3. Run your trace-parsing application
 4. Launch QEMU with the `-cannoli` argument, and a path to the compiled
