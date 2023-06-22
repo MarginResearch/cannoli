@@ -1,7 +1,7 @@
 //! Client for handling the IPC messages streamed from QEMU while it is
 //! executing
 
-#![feature(array_chunks, once_cell)]
+#![feature(array_chunks, lazy_cell)]
 
 use std::io::Read;
 use std::any::Any;

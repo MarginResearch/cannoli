@@ -6,7 +6,7 @@ all: clean
 	nm ./backtrace_test_mips > ./symbols.txt
 
 run_client:
-	cargo +nightly run --release --bin backtrace
+	cargo run --release --bin backtrace
 
 clean:
 	rm -f ./backtrace_test_mips
