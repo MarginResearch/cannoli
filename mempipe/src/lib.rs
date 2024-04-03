@@ -693,6 +693,6 @@ fn toot() -> Result<()> {
 
     println!("{:?}", elapsed);
 
-    panic!();
+    Ok(())
 }
 

@@ -1,5 +1,5 @@
 [package]
-name = "example_symbolizer"
+name = "symbolizer"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,7 @@ edition = "2021"
 
 [dependencies]
 cannoli = { path = "../../cannoli" }
+jitter = { path = "../../jitter" }
 
+[lib]
+crate-type = ["cdylib"]

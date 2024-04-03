@@ -1,5 +1,5 @@
-/Cargo.lock
 /target
 /*.kra
 /*.kra~
 /QEMU
+/result

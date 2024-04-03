@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 mempipe = { path = "../mempipe" }
 cannoli = { path = "../cannoli" }
-libc = "*"
+libc = "0.2"
 
 [build-dependencies]
-bindgen = "*"
+bindgen = "0.66"
 
