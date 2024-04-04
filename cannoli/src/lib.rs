@@ -13,6 +13,8 @@ use std::time::{Instant, Duration};
 use std::collections::HashMap;
 use mempipe::RecvPipe;
 
+pub use arch::{HostSyscallNum, TargetSyscallNum, SyscallParamType};
+
 /// Wrapper around [`Error`]
 type Result<T> = std::result::Result<T, Error>;
 
@@ -273,6 +275,147 @@ macro_rules! consume {
     }}
 }
 
+/// helper functions to handle consuming from buffer, since the consume macro
+/// can throw an error which is not tolerated by functions which have a defined
+/// return type (such as from<T>(t: T) -> S {}
+fn get_u8(v: &mut &[u8]) -> Result<u8> {
+    Ok(consume!(*v, u8).0)
+}
+
+fn get_u32(v: &mut &[u8]) -> Result<u32> {
+    Ok(consume!(*v, u32).0)
+}
+
+fn get_u64(v: &mut &[u8]) -> Result<u64> {
+    Ok(consume!(*v, u64).0)
+}
+
+/// types for syscall arguments and rets. Depending on the syscalls required,
+/// this list should be updated as needed
+#[derive(Debug)]
+pub enum SyscallParam<'a> {
+    Na,
+    Int { val: u64 },   // ints are always u64 for simplicity
+    Bool { val: bool }, // bools and chars are a single byte
+    Char { val: char },
+
+    /// the buffer format for RawPtr and CStr data types is as follows:
+    ///    u64      u32       data len
+    /// .______.__________.____________.
+    /// | addr | data len |    data    |
+    /// `------`----------`------------`
+    ///
+    RawPtr { addr: u64, data: Vec<u8> },
+    CStr { addr: u64, data: &'a CStr },
+}
+
+impl From<&mut &[u8]> for SyscallParam<'_> {
+    fn from(mut v: &mut &[u8]) -> Self {
+        let t = SyscallParamType::from(
+            get_u8(&mut v).unwrap());
+        match t {
+            SyscallParamType::Na => SyscallParam::Na,
+            SyscallParamType::Bool => {
+                let val = get_u8(&mut v).unwrap() != 0;
+                SyscallParam::Bool { val }
+            },
+            SyscallParamType::Char => {
+                let val = get_u8(&mut v).unwrap();
+                SyscallParam::Char { val: val as char }
+            },
+            SyscallParamType::Int => {
+                let val = get_u64(&mut v).unwrap();
+                SyscallParam::Int { val }
+            },
+            SyscallParamType::RawPtr => {
+                let addr = get_u64(&mut v).unwrap();
+                let data_len = get_u32(&mut v).unwrap();
+                let data = &v[..data_len as usize];
+                *v = &v[data_len as usize..];
+                SyscallParam::RawPtr {
+                    addr,
+                    data: data.to_vec(),
+                }
+            },
+            _ => panic!("unmatched SyscallParamType {:?}", t),
+        }
+    }
+}
+
+/// handler functions invoked by the cannoli->syscall callback defined in
+/// jitter/src/cannoli_internals.rs. These are defined separately to make the
+/// source code in cannoli_internals.rs more concise
+///
+/// this is an evergreen list and each syscall of interest must implement a
+/// unique function to handle its arguments and return value, since those vary
+/// between syscalls
+///
+/// the buffer format for the return value and args is defined above
+pub fn syscall_read(buf: &mut Vec<u8>, params: &Vec<u64>, guest_base: u64) {
+    // params and types
+    // ret: Int, fd: Int, buf: RawPtr, count: Int
+
+    // return
+    let ret = params[0];
+    buf.push(SyscallParamType::Int as u8);
+    buf.extend_from_slice(&ret.to_le_bytes());
+
+    // arguments
+    buf.extend_from_slice(&(3u32).to_le_bytes()); // number of args
+
+    buf.push(SyscallParamType::Int as u8);
+    buf.extend_from_slice(&(params[1]).to_le_bytes());
+
+    buf.push(SyscallParamType::RawPtr as u8);
+    // addr from syscall callback is target address (good). Push this not ptr,
+    // which is the qemu host address where the actual memory is copied
+    buf.extend_from_slice(&(params[2]).to_le_bytes());
+    let ptr = (params[2] + guest_base) as *mut u8;
+    buf.extend_from_slice(&(ret as u32).to_le_bytes()); // raw data len
+    unsafe {
+        for i in 0..ret {
+            buf.extend_from_slice(
+                &(*ptr.add(i.try_into().unwrap())).to_le_bytes());
+        }
+    }
+
+    buf.push(SyscallParamType::Int as u8);
+    buf.extend_from_slice(&(params[3]).to_le_bytes());
+}
+
+pub fn syscall_getrandom(buf: &mut Vec<u8>, params: &mut Vec<u64>,
+                         guest_base: u64) {
+    // params and types
+    // ret: Int, buf: RawPtr, buflen: Int, flags: Int
+
+    // return
+    let ret = params[0];
+    buf.push(SyscallParamType::Int as u8);
+    buf.extend_from_slice(&ret.to_le_bytes());
+
+    // arguments
+    buf.extend_from_slice(&(3u32).to_le_bytes()); // number of args
+
+    buf.push(SyscallParamType::RawPtr as u8);
+    // addr from syscall callback is target address (good). Push this not ptr,
+    // which is the qemu host address where the actual memory is copied
+    buf.extend_from_slice(&(params[1]).to_le_bytes());
+    let ptr = (params[1] + guest_base) as *mut u8;
+    buf.extend_from_slice(&(ret as u32).to_le_bytes()); // raw data len
+    unsafe {
+        for i in 0..ret {
+            buf.extend_from_slice(
+                &(*ptr.add(i.try_into().unwrap())).to_le_bytes());
+        }
+    }
+
+    buf.push(SyscallParamType::Int as u8);
+    buf.extend_from_slice(&(params[2]).to_le_bytes());
+
+    buf.push(SyscallParamType::Int as u8);
+    buf.extend_from_slice(&(params[3]).to_le_bytes());
+}
+
 /// Given a payload of bytes that came from the IPC channel, deserialize it and
 /// invoke callbacks based on the payload
 fn parse_payload<T: Cannoli>(pid: &T::PidContext, tid: &T::TidContext,
@@ -325,6 +468,25 @@ fn parse_payload<T: Cannoli>(pid: &T::PidContext, tid: &T::TidContext,
                 let (addr, len) = consume!(payload, u32, u32);
                 T::munmap(pid, tid, addr as u64, len as u64, trace)
             },
+            0x50 => { // syscall32
+                let mut params: Vec<SyscallParam> = Vec::new();
+                let target_num = TargetSyscallNum::from(
+                    consume!(payload, u32).0);
+                let num = HostSyscallNum::from(target_num);
+
+                // ensure syscall has data
+                if num == HostSyscallNum::NotHandled { return Ok(()); }
+                // parse ret
+                let ret = SyscallParam::from(&mut payload);
+
+                // parse arguments
+                let arg_count = consume!(payload, u32).0;
+                for _ in 0..arg_count {
+                    let j = SyscallParam::from(&mut payload);
+                    params.push(j);
+                }
+                T::syscall(pid, tid, num, ret, &params, trace)
+            },
             0xb0 => { // Mmap64
                 let (addr, len, anon, read, write, exec, path_len, offset) =
                     consume!(payload, u64, u64, u8, u8, u8, u8, u32, u64);
@@ -341,6 +503,25 @@ fn parse_payload<T: Cannoli>(pid: &T::PidContext, tid: &T::TidContext,
                 let (addr, len) = consume!(payload, u64, u64);
                 T::munmap(pid, tid, addr, len, trace)
             },
+            0xd0 => { // syscall64
+                let mut params: Vec<SyscallParam> = Vec::new();
+                let target_num = TargetSyscallNum::from(
+                    consume!(payload, u32).0);
+                let num = HostSyscallNum::from(target_num);
+
+                // ensure syscall has data
+                if num == HostSyscallNum::NotHandled { return Ok(()); }
+                // parse ret
+                let ret = SyscallParam::from(&mut payload);
+
+                // parse arguments
+                let arg_count = consume!(payload, u32).0;
+                for _ in 0..arg_count {
+                    let j = SyscallParam::from(&mut payload);
+                    params.push(j);
+                }
+                T::syscall(pid, tid, num, ret, &params, trace)
+           },
 
             0x11 => { // Read8_32
                 let (addr, val, pc) = consume!(payload, u32, u8, u32);
@@ -899,5 +1080,10 @@ pub trait Cannoli: Send + Sync {
     fn munmap(_pid: &Self::PidContext, _tid: &Self::TidContext,
               _base: u64, _len: u64,
               _trace: &mut Vec<Self::Trace>) {}
+
+    /// Invoked when the guest syscall is passed to host
+    fn syscall(_pid: &Self::PidContext, _tid: &Self::TidContext,
+              _number: HostSyscallNum, _ret: SyscallParam,
+              _args: &Vec<SyscallParam>, _trace: &mut Vec<Self::Trace>) {}
 }
 

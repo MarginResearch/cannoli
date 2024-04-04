@@ -52,6 +52,7 @@ struct Cannoli32 {
     /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
+    void (*jit_drop)(void);
 
     /// Invoked when QEMU is lifting a memory operation. Similar to the
     /// execution hook, this function is provided with a `buf` and a
@@ -82,10 +83,15 @@ struct Cannoli32 {
     /// memory.
     void (*mmap)(uint32_t start, uint32_t len, int is_anon, int is_read,
             int is_write, int is_exec, char *path, uint32_t offset);
-    
+
     /// Invoked when the Linux application invokes munmap() (even if
     /// unsuccessful)
     void (*munmap)(uint32_t start, uint32_t len);
+
+    /// Invoked when the Linux application returns from a guest syscall which
+    /// was passed to the host for execution
+    void (*syscall)(uint32_t num, uint64_t ret, uint64_t* ptr, uint32_t length,
+        uint64_t guest_base);
 };
 
 /// Definition of the bindings defined in Cannoli, passed to QEMU so it knows
@@ -125,6 +131,7 @@ struct Cannoli64 {
     /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the
     /// user an opportunity to observe the changes to the registers
     void (*jit_exit)(size_t r12, size_t r13, size_t r14);
+    void (*jit_drop)(void);
 
     /// Invoked when QEMU is lifting a memory operation. Similar to the
     /// execution hook, this function is provided with a `buf` and a
@@ -150,7 +157,7 @@ struct Cannoli64 {
     /// - `buf_size` - Size of `buf` in bytes
     size_t (*lift_memop)(uint64_t pc, int32_t is_write, size_t data_reg,
         size_t addr_reg, int32_t memop, uint8_t *buf, size_t buf_size);
-    
+
     /// Invoked when the Linux application successfully has mmap()ed new
     /// memory.
     void (*mmap)(uint64_t start, uint64_t len, int is_anon, int is_read,
@@ -159,17 +166,21 @@ struct Cannoli64 {
     /// Invoked when the Linux application invokes munmap() (even if
     /// unsuccessful)
     void (*munmap)(uint64_t start, uint64_t len);
+
+    /// Invoked when the Linux application returns from a guest syscall which
+    /// was passed to the host for execution
+    void (*syscall)(uint32_t num, uint64_t ret, uint64_t* ptr, uint32_t length,
+        uint64_t guest_base);
 };
 
 // If we're building in QEMU these will be defined and we'll make an alias for
 // the correct bit-width for the target architecture
-#if TARGET_LONG_BITS == 32
-typedef struct Cannoli32 Cannoli;
-#define CANNOLI_ENTRY "init_cannoli32"
-#elif TARGET_LONG_BITS == 64
 typedef struct Cannoli64 Cannoli;
 #define CANNOLI_ENTRY "init_cannoli64"
-#endif
+
+#define CANNOLI_R12_OFFSET 0
+#define CANNOLI_R13_OFFSET 1
+#define CANNOLI_R14_OFFSET 2
 
 #endif // CANNOLI_BINDGEN
 

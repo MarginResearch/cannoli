@@ -19,7 +19,13 @@ use std::mem::{ManuallyDrop, size_of};
 use std::cell::{RefCell, UnsafeCell, RefMut};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
-use cannoli::{Architecture, ClientConn};
+use cannoli::{
+    Architecture,
+    ClientConn,
+    syscall_read,
+    syscall_getrandom,
+    TargetSyscallNum
+};
 use mempipe::{SendPipe, ChunkWriter};
 
 /// Chunk size to use when streaming data over IPC
@@ -29,11 +35,16 @@ const CHUNK_SIZE: usize = 256 * 1024;
 const NUM_BUFFERS: usize = 16;
 
 // Pull in the FFI bindings we generated
-include!(concat!(env!("OUT_DIR"), "/ffi_bindings.rs"));
+mod ffi {
+    #![allow(dead_code)]
+    include!(concat!(env!("OUT_DIR"), "/ffi_bindings.rs"));
+}
+use ffi::*;
 
 extern "Rust" {
     fn hook_inst(_pc: u64, _branch: bool) -> HookType;
     fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool;
+    fn hook_user_syscall() -> bool;
 }
 
 /// Different types of hooks
@@ -263,7 +274,8 @@ static REGISTER_SIZE: AtomicUsize = AtomicUsize::new(0);
 macro_rules! create_bitness {
     (
         $tusize:ty, $cannoli:tt, $init:ident, $lift:ident, $entry:ident,
-        $exit:ident, $flush:ident, $memop:ident, $mmap:ident, $munmap:ident
+        $exit:ident, $flush:ident, $memop:ident, $mmap:ident, $munmap:ident,
+        $syscall:ident, $drop:ident
     ) => {
 
 /// Called by QEMU to initialize this library, we also return version
@@ -278,8 +290,10 @@ extern fn $init(arch: *const i8, big_endian: i32, gpr_offset: usize,
         lift_memop:       Some($memop),
         jit_entry:        Some($entry),
         jit_exit:         Some($exit),
+        jit_drop:         Some($drop),
         mmap:             Some($mmap),
         munmap:           Some($munmap),
+        syscall:          Some($syscall),
     };
 
     // Save the register offset and size in the globals.
@@ -469,6 +483,16 @@ unsafe extern fn $entry(out_regs: *mut usize) {
     });
 }
 
+#[no_mangle]
+unsafe extern fn $drop() {
+    with_hook(|mut hook| {
+        match hook.active_buffer.take() {
+            Some(mut ab) => ManuallyDrop::drop(&mut ab),
+            None => (),
+        }
+    });
+}
+
 /// Invoked from QEMU when exiting the JIT. This is then provided with the
 /// values of `r12`, `r13`, and `r14` upon exit of the JIT, giving the user an
 /// opportunity to observe the changes to the registers
@@ -532,19 +556,27 @@ unsafe extern fn $memop(pc: $tusize, is_write: i32, data_reg: usize,
     /// QEMU 64-bit memory operation
     const MO_64: i32 = 3;
 
+    let is_write = match is_write {
+        0 => false,
+        1 => true,
+        _ => panic!("Cannoli unsupported is_write value"),
+    };
+
     // Make sure the `memop` and `is_write` parameters match the strict
     // expectations we have of them.
     assert!(matches!(memop, MO_8 | MO_16 | MO_32 | MO_64),
-        "Cannoli: Unsupported memop");
-    assert!(matches!(is_write, 0 | 1), "Cannoli unsupported is_write value");
+        "Cannoli: Unsupported {} memop: {:x}",
+        if is_write { "write" } else { "read" }, memop);
 
     // Make sure the register values make sense
-    assert!(data_reg < 16, "Cannoli: Invalid data_reg input to memop");
-    assert!(addr_reg < 16, "Cannoli: Invalid addr_reg input to memop");
+    assert!(data_reg < 16,
+            "Cannoli: Invalid data_reg input ({}) to memop", data_reg);
+    assert!(addr_reg < 16,
+            "Cannoli: Invalid addr_reg input ({}) to memop", addr_reg);
 
     // Do nothing if the hook doesn't want to hook this operation
     let memsize = [1, 2, 4, 8];
-    if !hook_mem(pc as u64, is_write != 0, memsize[memop as usize]) {
+    if !hook_mem(pc as u64, is_write, memsize[memop as usize]) {
         return 0;
     }
 
@@ -741,6 +773,65 @@ unsafe extern fn $munmap(start: $tusize, len: $tusize) {
     });
 }
 
+/// Callback for syscalls
+/// syscall num matches the target architecture and ret is cast to a u64
+/// for universality. ptr points to a malloc'd buffer of <length> u64 arguments.
+/// guest_base is the offset between the qemu host virtual offset and the guest
+/// virtual address (host_address = guest_address + guest_base). Pointers in
+/// the args array are target (guest) addresses. QEMU maps the guest using
+/// private pages with no permissions, and instead maintains regions (e.g.,
+/// heap) using a host region offset by guest_base bytes.
+#[no_mangle]
+unsafe extern fn $syscall(num: u32, ret: u64, ptr: *mut u64,
+                          length: u32, guest_base: u64) {
+    if !hook_user_syscall() {
+        return
+    }
+
+    // Make sure the hook state is thread-local
+    with_hook(|mut hook| {
+        // Temporary vector for building packet
+        let mut tmp = Vec::new();
+
+        // Opcode
+        tmp.push(if <$tusize>::BITS == 64 { 0xd0 } else { 0x50 });
+        tmp.extend_from_slice(&num.to_le_bytes());
+
+        // syscall info
+        // group params into a vec for easy passing
+        let mut params: Vec<u64> = Vec::new();
+        params.push(ret);
+
+        for i in 0..length {
+            unsafe {
+                let offset: usize = i.try_into().unwrap();
+                params.push(*ptr.add(offset) as u64);
+            }
+        }
+
+        match TargetSyscallNum::from(num) {
+            TargetSyscallNum::Read =>
+                syscall_read(&mut tmp, &mut params, guest_base),
+            TargetSyscallNum::Getrandom =>
+                syscall_getrandom(&mut tmp, &mut params, guest_base),
+            _ => return
+            // _ => {
+            //     let not_handled: u32 = TargetSyscallNum::NotHandled.into();
+            //     tmp.extend_from_slice(&not_handled.to_le_bytes());
+            // }, // return early to avoid taking buffer
+        }
+
+        // Shouldn't have an active buffer
+        assert!(hook.active_buffer.is_none(), "syscall from inside the JIT?");
+
+        // Allocate a new blocking buffer in our pipe
+        let buffer = hook.pipe.alloc_buffer(true);
+
+        // Send the payload
+        buffer.send(tmp);
+    });
+}
+
 }} // macro_rules!
 
 // ============================================================================
@@ -782,383 +873,11 @@ const REPLACE_WITH_REGHOOK_OFFSET: u32 = 0x3fcc88a3;
 /// Magic value to replace with the register state size
 const REPLACE_WITH_REGHOOK_SIZE: u32 = 0x652a1e21;
 
-// All of our shellcode is written in this global assembly block, and it is
+// All of our shellcode is written in this assembly file, and it is
 // ripped out and placed into the JIT. It's kinda neat. It seems ugly, but I
 // think this is way easier to make tweaks to than some weird assembler at
 // runtime
-std::arch::global_asm!(r#"
-
-// ============================================================================
-
-// Macro invoked when creating an instruction hook. This is where we log the PC
-// of the instruction being executed into the buffer!
-//
-// bits  - The bitness of the emulated target, either 32 or 64
-// width - The bitness divided by eight (number of bytes per target usize)
-// once  - Determines if this is a single-shot instruction hook, or an always
-//         hook
-.macro create_insthook bits, width, once
-
-// This code is injected _directly_ into QEMUs JIT, we have to make sure we
-// don't touch _any_ registers without preserving them
-.global cannoli_insthook\bits\()\once\()
-cannoli_insthook\bits\()\once\():
-    // r12 - Pointer to trace buffer
-    // r13 - Pointer to end of trace buffer
-    // r14 - Scratch
-
-.ifnb \once
-    // Clear the zero flag
-    xor r14d, r14d
-
-    // Conditionally branch to the end of code
-    jnz 10f
-
-    // Replace branch above with a `jmp`
-    mov byte ptr [rip - 9], 0xeb
-.endif
-
-    // Allocate room in the buffer
-    lea r14, [r12 + \width + 1]
-
-    // Make sure we didn't run out of buffer space
-    cmp r14, r13
-    jbe 2f
-
-    // We're out of space! This happens "rarely", only when the buffer is full,
-    // so we can do much more complex work here. We can also save and restore
-    // some registers.
-    //
-    // We directly call into our Rust to reduce the icache pollution and to get
-    // some code sharing for the much more complex flushing operation
-    //
-    // Flushing gets us a new r12, r13, and r14
-    mov  r13, {REPLACE_WITH_FLUSH}
-    call r13
-
-2:
-.if \bits == 32
-    // Opcode
-    mov byte ptr [r12], 0x00
-
-    // PC, directly put into memory from an immediate
-    mov dword ptr [r12 + 1], {REPLACE_WITH_PC}
-.elseif \bits == 64
-    // Opcode
-    mov byte ptr [r12], 0x80
-
-    // Move PC into a register so we can use imm64 encoding
-    mov r14, {REPLACE_WITH_PC}
-    mov qword ptr [r12 + 1], r14
-.else
-.error "Invalid bitness passed to create_insthook"
-.endif
-
-    // Advance buffer
-    add r12, \width + 1
-
-    // End of hook
-10:
-
-.global cannoli_insthook\bits\()\once\()_end
-cannoli_insthook\bits\()\once\()_end:
-
-.endm // create_insthook
-
-// Create both the 32-bit and 64-bit instruction hooks
-create_insthook 32, 4
-create_insthook 64, 8
-create_insthook 32, 4, _once
-create_insthook 64, 8, _once
-
-// ============================================================================
-
-// Okay. This macro is gnarly. This defines the shellcode we use for our memory
-// hooks. Unlike the PC shellcode, we actually have 2 register inputs from
-// QEMU's JIT. These registers could be "any" register that is scheduled to the
-// JIT. Thus, we have to create different shellcode templates for every
-// combination of registers.
-//
-// So, we've made this macro. The way this macro is invoked is disgusting, but
-// the macro itself is pretty clean. Inside the macro you have a few different
-// values you can access:
-//
-// \access    - Either 'read' or 'write' (no quotes) depending on the operation
-//              type
-// \datawidth - The size of the read/write being performed (1, 2, 4, or 8)
-// \width     - The size of the target's usize, in bytes (4 or 8)
-// \data      - The register name of the register which holds the data that
-//              was read/written
-// \addr      - The register name of the register which holds the address
-.macro create_memhook access, datawidth, width, data, addr
-.global cannoli_memhook_\access\()_\data\()_\addr\()
-cannoli_memhook_\access\()_\data\()_\addr\():
-    // r12 - Pointer to trace buffer
-    // r13 - Pointer to end of trace buffer
-    // r14 - For reads, this always holds the address, for writes, it's scratch
-
-    // Allocate room in the buffer (we have to preserve r14 here)
-    lea r12, [r12 + (\width * 2 + \datawidth + 1)]
-    cmp r12, r13
-    lea r12, [r12 - (\width * 2 + \datawidth + 1)]
-    jbe 2f
-
-    // We're out of space! This happens "rarely", only when the buffer is full,
-    // so we can do much more complex work here. We can also save and restore
-    // some registers.
-    //
-    // We directly call into our Rust to reduce the icache pollution and to get
-    // some code sharing for the much more complex flushing operation
-    //
-    // Flushing gets us a new r12, r13, and r14
-    mov  r13, {REPLACE_WITH_FLUSH}
-    call r13
-
-2:
-.ifc \access, read
-    // Read opcode
-    mov byte ptr [r12], (((\width / 4) - 1) << 7) | 0x10 | \datawidth
-.endif
-.ifc \access, write
-    // Write opcode
-    mov byte ptr [r12], (((\width / 4) - 1) << 7) | 0x20 | \datawidth
-.endif
-
-    // Address and data
-    mov [r12          + 1], \addr
-    mov [r12 + \width + 1], \data
-
-    // Store the PC
-.if \width == 4
-    mov dword ptr [r12 + \width + 1 + \datawidth], {REPLACE_WITH_PC}
-.elseif \width == 8
-    mov r14, {REPLACE_WITH_PC}
-    mov [r12 + \width + 1 + \datawidth], r14
-.endif
-
-    // Advance buffer
-    add r12, \width * 2 + \datawidth + 1
-
-.global cannoli_memhook_\access\()_\data\()_\addr\()_end
-cannoli_memhook_\access\()_\data\()_\addr\()_end:
-.endm // create_memhook
-
-// Macro invoked when creating an register hook.
-//
-// bits  - The bitness of the emulated target, either 32 or 64
-// width - The bitness divided by eight (number of bytes per target usize)
-.macro create_reghook bits, width
-
-.global cannoli_reghook\bits\()
-cannoli_reghook\bits\():
-    // Determine size required for register hook metadata
-    lea r14, [r12 + 1 + 4 + \width]
-    add r14, {REPLACE_WITH_REGHOOK_SIZE}
-
-    // Make sure we're in bounds
-    cmp r14, r13
-    jbe 2f
-
-    // We're out of space! This happens "rarely", only when the buffer is full,
-    // so we can do much more complex work here. We can also save and restore
-    // some registers.
-    //
-    // We directly call into our Rust to reduce the icache pollution and to get
-    // some code sharing for the much more complex flushing operation
-    //
-    // Flushing gets us a new r12, r13, and r14
-    mov  r13, {REPLACE_WITH_FLUSH}
-    call r13
-
-2:
-.if \bits == 32
-    // Opcode
-    mov byte ptr [r12], 0x01
-
-    // Size of payload
-    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
-
-    // PC, directly put into memory from an immediate
-    mov dword ptr [r12 + 1 + 4], {REPLACE_WITH_PC}
-.elseif \bits == 64
-    // Opcode
-    mov byte ptr [r12], 0x81
-
-    // Size of payload
-    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
-
-    // Move PC into a register so we can use imm64 encoding
-    mov r14, {REPLACE_WITH_PC}
-    mov qword ptr [r12 + 1 + 4], r14
-.else
-.error "Invalid bitness passed to cannoli_reghook"
-.endif
-
-    // Fill in the registers
-    push rdi
-    push rsi
-    push rcx
-    lea rdi, [r12 + \width + 1 + 4]
-    lea rsi, [rbp + {REPLACE_WITH_REGHOOK_OFFSET}]
-    mov ecx, {REPLACE_WITH_REGHOOK_SIZE}
-    rep movsb
-    pop rcx
-    pop rsi
-    pop rdi
-
-    // Advance buffer
-    add r12, \width + 1 + 4
-    add r12, {REPLACE_WITH_REGHOOK_SIZE}
-
-.global cannoli_reghook\bits\()_end
-cannoli_reghook\bits\()_end:
-
-.endm // create_reghook
-
-create_reghook 32, 4
-create_reghook 64, 8
-
-// Macro invoked when creating an true branch hook.
-//
-// bits  - The bitness of the emulated target, either 32 or 64
-// width - The bitness divided by eight (number of bytes per target usize)
-// branch - Bool indicating if this is a branch or not
-.macro create_branchhook bits, width, is_branch
-
-.global cannoli_branchhook\is_branch\()\bits\()
-cannoli_branchhook\is_branch\()\bits\():
-    // Determine size required for register hook metadata
-    // One more byte required (versus reghook) for branch boolean
-    lea r14, [r12 + 1 + 4 + \width + 1]
-    add r14, {REPLACE_WITH_REGHOOK_SIZE}
-
-    // Make sure we're in bounds
-    cmp r14, r13
-    jbe 2f
-
-    // We're out of space! This happens "rarely", only when the buffer is full,
-    // so we can do much more complex work here. We can also save and restore
-    // some registers.
-    //
-    // We directly call into our Rust to reduce the icache pollution and to get
-    // some code sharing for the much more complex flushing operation
-    //
-    // Flushing gets us a new r12, r13, and r14
-    mov  r13, {REPLACE_WITH_FLUSH}
-    call r13
-
-2:
-.if \bits == 32
-    // Opcode
-    mov byte ptr [r12], 0x40
-
-    // Size of payload
-    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
-
-    // PC, directly put into memory from an immediate
-    mov dword ptr [r12 + 1 + 4], {REPLACE_WITH_PC}
-    mov byte ptr [r12 + 1 + 4 + \width], \is_branch
-.elseif \bits == 64
-    // Opcode
-    mov byte ptr [r12], 0xc0
-
-    // Size of payload
-    mov dword ptr [r12 + 1], {REPLACE_WITH_REGHOOK_SIZE}
-
-    // Move PC into a register so we can use imm64 encoding
-    mov r14, {REPLACE_WITH_PC}
-    mov qword ptr [r12 + 1 + 4], r14
-    mov byte ptr [r12 + 1 + 4 + \width], \is_branch
-.else
-.error "Invalid bitness passed to cannoli_branchhook"
-.endif
-
-    // Fill in the registers
-    push rdi
-    push rsi
-    push rcx
-    lea rdi, [r12 + \width + 1 + 4 + 1]
-    lea rsi, [rbp + {REPLACE_WITH_REGHOOK_OFFSET}]
-    mov ecx, {REPLACE_WITH_REGHOOK_SIZE}
-    rep movsb
-    pop rcx
-    pop rsi
-    pop rdi
-
-    // Advance buffer
-    add r12, \width + 1 + 4 + 1
-    add r12, {REPLACE_WITH_REGHOOK_SIZE}
-
-.global cannoli_branchhook\is_branch\()\bits\()_end
-cannoli_branchhook\is_branch\()\bits\()_end:
-
-.endm // create_branchhook
-
-create_branchhook 32, 4, 1
-create_branchhook 32, 4, 0
-create_branchhook 64, 8, 1
-create_branchhook 64, 8, 0
-
-// ===========================================================================
-// !!! WARNING !!!
-//
-// Don't look below, the code is disgusting. This code generates all of the
-// possible combinations of the memory operations. Based on bitness, operation
-// size, 2 register inputs, idk probably some other stuff.
-//
-// It might look gross, but honestly, I think it gives us a really cool
-// environment above to write the memory hook shellcode. Thus, don't complain
-// about it. Go away.
-// ===========================================================================
-
-// For each `addr` in `regs`, create the read and write memhooks. Using the
-// `addr` as the address register name when creating the code
-.macro multiple_create_memhook_int datawidth, width, data, addr, regs:vararg
-    // Create the memhook
-    create_memhook read,  \datawidth, \width, \data, \addr
-    create_memhook write, \datawidth, \width, \data, \addr
-
-    // Continue creating memhooks until we're out of regs
-    .ifnb \regs
-        multiple_create_memhook_int \datawidth, \width, \data, \regs
-    .endif
-.endm // multiple_create_memhook_int
-
-// For each `data` in `regs`, this extracts the register name to use for the
-// data argument. This generates the memhooks for 32-bit usize targets
-.macro multiple_create_memhook32 datawidth, reg, regs:vararg
-    multiple_create_memhook_int \datawidth, 4, \reg, eax, ecx, edx, ebx, esp, ebp, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
-
-    // Continue creating memhooks until we're out of regs
-    .ifnb \regs
-        multiple_create_memhook32 \datawidth, \regs
-    .endif
-.endm
-
-// For each `data` in `regs`, this extracts the register name to use for the
-// data argument. This generates the memhooks for 64-bit usize targets
-.macro multiple_create_memhook64 datawidth, reg, regs:vararg
-    multiple_create_memhook_int \datawidth, 8, \reg, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
-
-    // Continue creating memhooks until we're out of regs
-    .ifnb \regs
-        multiple_create_memhook64 \datawidth, \regs
-    .endif
-.endm
-
-// Create all possible memhooks for 32-bit
-multiple_create_memhook32 1, al, cl, dl, bl, spl, bpl, sil, dil, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b
-multiple_create_memhook32 2, ax, cx, dx, bx, sp, bp, si, di, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w
-multiple_create_memhook32 4, eax, ecx, edx, ebx, esp, ebp, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
-multiple_create_memhook32 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
-
-// Create all possible memhooks for 64-bit
-multiple_create_memhook64 1, al, cl, dl, bl, spl, bpl, sil, dil, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b
-multiple_create_memhook64 2, ax, cx, dx, bx, sp, bp, si, di, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w
-multiple_create_memhook64 4, eax, ecx, edx, ebx, esp, ebp, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
-multiple_create_memhook64 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
-
-"#,
+std::arch::global_asm!(include_str!("cannoli_internals.S"),
     // Some magic values we use in our assembly for find-and-replace
     REPLACE_WITH_FLUSH = const REPLACE_WITH_FLUSH,
     REPLACE_WITH_PC    = const REPLACE_WITH_PC,
@@ -1170,14 +889,14 @@ multiple_create_memhook64 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10
 // Create the 32-bit Cannoli implementation
 create_bitness!(
     u32, Cannoli32, init_cannoli32, lift_instruction32, jit_entry32,
-    jit_exit32, cannoli_flush_buffer32, lift_memop32,
-    cannoli_mmap32, cannoli_munmap32
+    jit_exit32, cannoli_flush_buffer32, lift_memop32, cannoli_mmap32,
+    cannoli_munmap32, cannoli_syscall32, jit_drop32
 );
 
 // Create the 64-bit Cannoli implementation
 create_bitness!(
     u64, Cannoli64, init_cannoli64, lift_instruction64, jit_entry64,
-    jit_exit64, cannoli_flush_buffer64, lift_memop64,
-    cannoli_mmap64, cannoli_munmap64
+    jit_exit64, cannoli_flush_buffer64, lift_memop64, cannoli_mmap64,
+    cannoli_munmap64, cannoli_syscall64, jit_drop64
 );
 

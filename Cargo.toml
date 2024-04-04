@@ -13,6 +13,7 @@ members = [
     "examples/coverage",
     "examples/regtrace",
     "examples/backtrace",
+    "extensions/arch",
 ]
 default-members = [
     "jitter_always",

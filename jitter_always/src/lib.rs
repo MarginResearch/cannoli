@@ -20,3 +20,7 @@ fn hook_mem(_pc: u64, _write: bool, _size: usize) -> bool {
     true
 }
 
+#[no_mangle]
+fn hook_user_syscall() -> bool {
+    true
+}

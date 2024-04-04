@@ -6,10 +6,10 @@
     # flake.lock will pin this to a fixed version, update with "nix flake update"
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # Pull in nixpkgs at a point in time where qemu-7.2 existed
+    # Pull in nixpkgs at a point in time where qemu-8.1.2 existed
     # Use this to find the applicable git hash:
     # https://lazamar.co.uk/nix-versions/?channel=nixpkgs-unstable&package=qemu
-    qemu-nixpkgs.url = "github:NixOS/nixpkgs/1b7a6a6e57661d7d4e0775658930059b77ce94a4";
+    qemu-nixpkgs.url = "github:NixOS/nixpkgs/6eed4c2552c41690535d08a2e071bca005226a4a";
 
     # Rust toolchain
     rust-overlay = {
@@ -84,12 +84,9 @@
           (fs.fileFilter ({name,...}: name == "cannoli.h") ./.);
       };
 
-      qemuSrc = pkgs: pkgs.fetchFromGitLab {
-        owner = "qemu-project";
-        repo = "qemu";
-        rev = "00b1faea41d283e931256aa78aa975a369ec3ae6";
-        fetchSubmodules = true;
-        hash = "sha256-Wy/dUaUes2nqdhT3yb6zVBQLOeLstn1379brqw0O6aU=";
+      qemuSrc = pkgs: pkgs.fetchurl {
+        url = "https://download.qemu.org/qemu-8.1.2.tar.xz";
+        sha256 = "sha256-VBUmp2RXbrSU0v9exGrrJT5i6ikDXRwjwKivTmzU8Ic=";
       };
 
       # nixpkgs overlay defining the qemu-cannoli package
@@ -119,6 +116,7 @@
             # speed up builds with these flags
             "--disable-docs"
             "--disable-tools"
+            "--disable-download"
             # add the cannoli configure flag
             "--with-cannoli=${cannoli-headers}"
           ];
@@ -159,7 +157,7 @@
         fileset = fs.unions [
           ./Cargo.lock ./.cargo
           # common crates needed by everything in the workspace
-          ./jitter ./mempipe ./cannoli
+          ./jitter ./mempipe ./cannoli ./extensions/arch
           # keep all Cargo.tomls as scaffolding for workspace
           (fs.fileFilter (file: file.name == "Cargo.toml") ./.)
           # add the source of the crate we want to compile
@@ -169,11 +167,19 @@
 
       crateNameFromPath = cratePath: (lib.importTOML (./. + ("/" + cratePath + "/Cargo.toml"))).package.name;
 
+      workspaceDeps = cratePath: craneLib.buildDepsOnly {
+        src = ./.;
+        pname = crateNameFromPath cratePath;
+        cargoVendorDir = vendoredCrates;
+        cargoExtraArgs = "-p ${crateNameFromPath cratePath}";
+      };
+
       buildWorkspaceCrate = cratePath: craneLib.buildPackage {
         src = srcForCrate cratePath;
         pname = crateNameFromPath cratePath;
         # create a src/lib.rs next to every Cargo.toml
         postUnpack = "${lib.getExe pkgs.fd} Cargo.toml -tf -x mkdir -p {//}/src ';' -x touch {//}/src/lib.rs";
+        cargoArtifacts = workspaceDeps cratePath;
         cargoVendorDir = vendoredCrates;
         cargoExtraArgs = "-p ${crateNameFromPath cratePath}";
         doNotLinkInheritedArtifacts = true;
