@@ -86,6 +86,24 @@ cd examples/symbolizer
 </path/to/qemu>/build/qemu-mipsel -cannoli </path/to/cannoli>/target/release/<your jitter so>.so ./example_app
 ```
 
+### Using the Nix flake
+
+If you have Nix, getting a build of qemu with the Cannoli patches is just:
+
+```bash
+nix --experimental-features 'nix-command flakes' build
+```
+
+The supported emulators will be in ./result/bin after a few minutes of compiling.
+
+There's also a nix devshell, which you can use to populate a temporary shell
+with Cannoli and the supported rust toolchain, for development of applications
+that consume Cannoli traces:
+
+```bash
+nix --experimental-features 'nix-command flakes' develop
+```
+
 ## Coverage Example
 
 Cannoli can be used to get coverage of binary applications for pretty cheap.
