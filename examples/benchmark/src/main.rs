@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::time::Instant;
-use cannoli::{Cannoli, create_cannoli};
+use cannoli::Cannoli;
 
 /// Get the time stamp counter
 fn rdtsc() -> u64 {
@@ -74,6 +74,6 @@ impl Cannoli for Benchmark {
 }
 
 fn main() {
-    create_cannoli::<Benchmark>(4).unwrap();
+    cannoli::run::<Benchmark>(4).unwrap();
 }
 

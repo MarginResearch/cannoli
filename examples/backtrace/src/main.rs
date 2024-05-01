@@ -3,7 +3,7 @@
 #![feature(array_chunks)]
 
 use std::sync::{Arc, Mutex};
-use cannoli::{Cannoli, create_cannoli};
+use cannoli::Cannoli;
 
 use crate::utils::backtrace::{
     BacktraceState,
@@ -128,5 +128,5 @@ impl Cannoli for BacktraceExample {
 }
 
 fn main() {
-    create_cannoli::<BacktraceExample>(4).unwrap();
+    cannoli::run::<BacktraceExample>(4).unwrap();
 }

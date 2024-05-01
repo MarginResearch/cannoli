@@ -851,13 +851,17 @@ fn handle_client<T>(
     Ok(())
 }
 
-/// Create a new Cannoli server. This will spin up the required processing
-/// needed to talk with QEMU and deserialize messages, while dispatching
-/// callbacks to a user-controlled `user_self`
+/// Create a new Cannoli server and handle clients in parallel.
+///
+/// This will spin up the required processing needed to talk with QEMU and
+/// deserialize messages, while dispatching callbacks to a user-defined `T`
+/// which implements [`Cannoli`].
 ///
 /// Create `threads` number of threads for every connection that comes in.
 /// These threads will handle all Cannoli parsing and callbacks
-pub fn create_cannoli<T>(threads: usize) -> Result<()>
+///
+/// See [`run`] to serve a single client.
+pub fn run_forever<T>(threads: usize) -> Result<()>
         where T: Cannoli + 'static,
               T::PidContext: Send + Sync + 'static {
     // Create socket, waiting for clients to connect and inform us about some
@@ -871,61 +875,90 @@ pub fn create_cannoli<T>(threads: usize) -> Result<()>
         for stream in listener.incoming() {
             // Spawn a thread on new connections
             scope.spawn(move || {
-                // Get access to the stream
-                let mut stream = stream.expect("Failed to get TCP stream");
-
-                // Get the header
-                let mut header: MaybeUninit<ClientConn> =
-                    MaybeUninit::uninit();
-                stream.read_exact(unsafe {
-                    core::slice::from_raw_parts_mut(
-                        header.as_mut_ptr() as *mut u8,
-                        core::mem::size_of_val(&header))
-                }).expect("Failed to get client header");
-
-                // Get the actual header now that it's initialized
-                let header: ClientConn = unsafe { header.assume_init() };
-
-                // Get the pcomm and comm
-                let mut comm =
-                    vec![0u8; header.pcomm_len as usize +
-                              header.comm_len  as usize];
-                stream.read_exact(&mut comm)
-                    .expect("Failed to get client pcomm and comm");
-
-                // Construct client information
-                let ci = ClientInfo {
-                    // IPC pipe UID
-                    uid: header.uid,
-
-                    // Architecture
-                    arch: Architecture::from(header.arch),
-
-                    // Endianness
-                    big_endian: header.big_endian != 0,
-
-                    // PIDs
-                    ppid: header.ppid,
-                    pid:  header.pid,
-                    tid:  header.tid,
-
-                    pcomm: std::str::from_utf8(
-                        &comm[..header.pcomm_len as usize])
-                        .ok().map(|x| x.to_string()),
-                    comm: std::str::from_utf8(
-                        &comm[header.pcomm_len as usize..])
-                        .ok().map(|x| x.to_string()),
-                };
-
-                // Handle the client
-                handle_client::<T>(stream, threads, &ci)
-                    .expect("Failed to handle client");
+                handle_connection::<T>(stream.expect("Failed to get TCP stream"), threads);
             });
         }
 
         // All done!
         Ok(())
     })
+}
+
+/// Create a new Cannoli server and handle one client.
+///
+/// This will spin up the required processing needed to talk with QEMU and
+/// deserialize messages, while dispatching callbacks to a user-defined `T`
+/// which implements [`Cannoli`].
+///
+/// Create `threads` number of threads for the connection that comes in.
+/// These threads will handle all Cannoli parsing and callbacks
+///
+/// See [`run_forever`] to serve multiple clients in parallel.
+pub fn run<T>(threads: usize) -> Result<()>
+        where T: Cannoli + 'static,
+              T::PidContext: Send + Sync + 'static {
+    // Create socket, waiting for clients to connect and inform us about some
+    // memory regions
+    let listener = TcpListener::bind("127.0.0.1:11458")
+        .map_err(Error::Bind)?;
+
+    // Wait for connection
+    let (stream, _from) = listener.accept().unwrap();
+
+    // Handle one connection then exit
+    handle_connection::<T>(stream, threads);
+
+    // All done!
+    Ok(())
+}
+
+fn handle_connection<T>(mut stream: TcpStream, threads: usize) where T: Cannoli + 'static {
+    // Get the header
+    let mut header: MaybeUninit<ClientConn> =
+        MaybeUninit::uninit();
+    stream.read_exact(unsafe {
+        core::slice::from_raw_parts_mut(
+            header.as_mut_ptr() as *mut u8,
+            core::mem::size_of_val(&header))
+    }).expect("Failed to get client header");
+
+    // Get the actual header now that it's initialized
+    let header: ClientConn = unsafe { header.assume_init() };
+
+    // Get the pcomm and comm
+    let mut comm =
+        vec![0u8; header.pcomm_len as usize +
+                  header.comm_len  as usize];
+    stream.read_exact(&mut comm)
+        .expect("Failed to get client pcomm and comm");
+
+    // Construct client information
+    let ci = ClientInfo {
+        // IPC pipe UID
+        uid: header.uid,
+
+        // Architecture
+        arch: Architecture::from(header.arch),
+
+        // Endianness
+        big_endian: header.big_endian != 0,
+
+        // PIDs
+        ppid: header.ppid,
+        pid:  header.pid,
+        tid:  header.tid,
+
+        pcomm: std::str::from_utf8(
+            &comm[..header.pcomm_len as usize])
+            .ok().map(|x| x.to_string()),
+        comm: std::str::from_utf8(
+            &comm[header.pcomm_len as usize..])
+            .ok().map(|x| x.to_string()),
+    };
+
+    // Handle the client
+    handle_client::<T>(stream, threads, &ci)
+        .expect("Failed to handle client");
 }
 
 /// Trait which must be implemented by a user to implement their hooks and

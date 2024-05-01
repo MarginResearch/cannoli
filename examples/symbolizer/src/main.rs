@@ -1,7 +1,7 @@
 //! An example user of Cannoli which symbolizes a trace
 
 use std::sync::Arc;
-use cannoli::{Cannoli, create_cannoli};
+use cannoli::Cannoli;
 
 /// An original pointer address, and then a resolved symbol + offset for that
 /// address
@@ -170,6 +170,6 @@ impl Cannoli for Symbolizer {
 }
 
 fn main() {
-    create_cannoli::<Symbolizer>(2).unwrap();
+    cannoli::run::<Symbolizer>(2).unwrap();
 }
 

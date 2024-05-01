@@ -3,7 +3,7 @@
 #![feature(array_chunks)]
 
 use std::sync::Arc;
-use cannoli::{Cannoli, create_cannoli};
+use cannoli::Cannoli;
 
 /// The structure we implement [`Cannoli`] for!
 struct Coverage;
@@ -42,6 +42,6 @@ impl Cannoli for Coverage {
 }
 
 fn main() {
-    create_cannoli::<Coverage>(4).unwrap();
+    cannoli::run::<Coverage>(4).unwrap();
 }
 

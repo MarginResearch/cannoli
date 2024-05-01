@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 use std::sync::atomic::{AtomicU64, Ordering};
-use cannoli::{Cannoli, create_cannoli};
+use cannoli::Cannoli;
 use snuffles::{CameraMode, Vsync, Msaa, EventHandler, Window, Vertex};
 use snuffles::{Persist, DrawCommand};
 
@@ -258,7 +258,7 @@ impl EventHandler for Renderer {
 fn main() {
     std::thread::spawn(|| {
         // Create Cannoli handler!
-        create_cannoli::<Tracer>(2).expect("Cannoli handler returned error");
+        cannoli::run::<Tracer>(2).expect("Cannoli handler returned error");
     });
 
     Window::<Renderer>::new("Hello world",

@@ -5,7 +5,7 @@
 use std::sync::{Mutex, LazyLock, Arc};
 use std::process::Command;
 use std::collections::{HashMap, BTreeMap, BTreeSet};
-use cannoli::{Cannoli, create_cannoli};
+use cannoli::Cannoli;
 
 struct CoverageDb {
     /// Symbols for the process
@@ -200,6 +200,6 @@ impl Cannoli for Coverage {
 }
 
 fn main() {
-    create_cannoli::<Coverage>(4).unwrap();
+    cannoli::run::<Coverage>(4).unwrap();
 }
 
