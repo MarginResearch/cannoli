@@ -1,6 +1,11 @@
 {
   description = "Cannoli development shell";
 
+  nixConfig = {
+    extra-substituters = ["https://cannoli.cachix.org"];
+    extra-trusted-public-keys = ["cannoli.cachix.org-1:nFKY7lRczFkkHacy6/OlfmpOU22MeEiDo90YV0QkVoQ="];
+  };
+
   inputs = {
     # Use the rolling-release cycle of nixpkgs for most tools
     # flake.lock will pin this to a fixed version, update with "nix flake update"

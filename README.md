@@ -94,6 +94,13 @@ If you have Nix, getting a build of qemu with the Cannoli patches is just:
 nix --experimental-features 'nix-command flakes' build
 ```
 
+If desired, you may also skip building and download pre-built binaries:
+
+```
+do you want to allow configuration setting 'extra-substituters' to be set to 'https://cannoli.cachix.org' (y/N)? y
+do you want to allow configuration setting 'extra-trusted-public-keys' to be set to 'cannoli.cachix.org-1:nFKY7lRczFkkHacy6/OlfmpOU22MeEiDo90YV0QkVoQ=' (y/N)? y
+```
+
 The supported emulators will be in ./result/bin after a few minutes of compiling.
 
 There's also a nix devshell, which you can use to populate a temporary shell
