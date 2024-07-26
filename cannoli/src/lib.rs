@@ -670,7 +670,7 @@ fn handle_client<T>(
         /// Next sequence number we are looking for to report traces
         next_seq: u64,
 
-        /// Vector of traces, maintained sorted, with a sequence identifer in
+        /// Vector of traces, maintained sorted, with a sequence identifier in
         /// the first part of the tuple
         traces: Vec<(u64, Vec<T::Trace>)>,
 
