@@ -42,8 +42,7 @@ use core::mem::{MaybeUninit, size_of};
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, AtomicU64, Ordering};
 
-#[cfg(target_family = "sushi_roll")]
-use alloc::alloc::{alloc, Layout};
+use alloc::alloc::{alloc, dealloc, Layout};
 
 #[cfg(target_family = "unix")]
 use core::mem::size_of_val;
@@ -152,7 +151,14 @@ pub struct SendPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
 
     /// Reference to the memory pipe
     mem_pipe: *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>,
+
+    /// Backed by a heap allocation from [`SendPipe::create_local`] rather
+    /// than shared memory
+    local: bool,
 }
+
+/// UID reported by local (heap-backed) pipes, which have no name to open
+const LOCAL_UID: u64 = 0xdeaddeaddeaddead;
 
 /// Get the filename for a given `uid`
 #[cfg(target_family = "unix")]
@@ -170,13 +176,13 @@ fn errno() -> std::io::Error {
 impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         SendPipe<CHUNK_SIZE, NUM_BUFFERS> {
     /// Create a pipe
+    #[cfg(target_family = "unix")]
     pub fn create() -> Result<Self> {
         // Make sure settings are sane
         if NUM_BUFFERS == 0 || CHUNK_SIZE == 0 {
             return Err(Error::InvalidPipeConfiguration);
         }
 
-        #[cfg(target_family = "unix")]
         let (mapped, uid) = {
             // Generate a random name
             let uid = rand::random::<u64>();
@@ -229,46 +235,62 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
             (mapped, uid)
         };
-        
-        #[cfg(target_family = "sushi_roll")]
-        let (mapped, uid) = {
-            // Allocate a buffer
-            let buf = unsafe {
-                alloc(Layout::new::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>())
-            };
-
-            // Make sure it's good!
-            assert!(!buf.is_null(), "Failed to allocate memory pipe");
-
-            // Return a pointer to this memory, and a fixed key. This is just
-            // for benchmarking so we don't need to support more than one key.
-            (
-                buf as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>,
-                0xdeaddeaddeaddead,
-            )
-        };
 
         // Initialize the memory
-        unsafe {
-            addr_of_mut!((*mapped).magic).write(MEMPIPE_MAGIC);
-            addr_of_mut!((*mapped).chunk_size).write(CHUNK_SIZE as u64);
-            addr_of_mut!((*mapped).num_buffers).write(NUM_BUFFERS as u64);
-            addr_of_mut!((*mapped).usize_size)
-                .write(size_of::<usize>() as u64);
-            addr_of_mut!((*mapped).uid).write(uid);
-            addr_of_mut!((*mapped).client_owned)
-                .write([const { AtomicBool::new(false) }; NUM_BUFFERS]);
-            addr_of_mut!((*mapped).client_len)
-                .write([const { AtomicUsize::new(0) }; NUM_BUFFERS]);
-            addr_of_mut!((*mapped).client_seq)
-                .write([const { AtomicU64::new(NO_SEQ) }; NUM_BUFFERS]);
-            addr_of_mut!((*mapped).cur_seq).write(AtomicU64::new(0));
+        unsafe { Self::init(mapped, uid); }
 
-            // Chunks are left uninitialized, which is okay as they are marked
-            // as [`MaybeUninit`]
+        Ok(Self { mem_pipe: mapped, uid, local: false })
+    }
+
+    /// Create a pipe. Only local pipes exist on this target
+    #[cfg(target_family = "sushi_roll")]
+    pub fn create() -> Result<Self> {
+        Self::create_local()
+    }
+
+    /// Create a pipe backed by a heap allocation in this process instead of
+    /// shared memory. The receiving side is opened with
+    /// [`RecvPipe::open_raw`] on [`SendPipe::raw`]. This is what tests,
+    /// benchmarks, and targets without shared memory use.
+    pub fn create_local() -> Result<Self> {
+        // Make sure settings are sane
+        if NUM_BUFFERS == 0 || CHUNK_SIZE == 0 {
+            return Err(Error::InvalidPipeConfiguration);
         }
 
-        Ok(Self { mem_pipe: mapped, uid })
+        // Allocate a buffer
+        let mapped = unsafe {
+            alloc(Layout::new::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>())
+        } as *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>;
+
+        // Make sure it's good!
+        assert!(!mapped.is_null(), "Failed to allocate memory pipe");
+
+        // Initialize the memory
+        unsafe { Self::init(mapped, LOCAL_UID); }
+
+        Ok(Self { mem_pipe: mapped, uid: LOCAL_UID, local: true })
+    }
+
+    /// Initialize a freshly allocated pipe
+    unsafe fn init(mapped: *mut RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>,
+        uid: u64) {
+        addr_of_mut!((*mapped).magic).write(MEMPIPE_MAGIC);
+        addr_of_mut!((*mapped).chunk_size).write(CHUNK_SIZE as u64);
+        addr_of_mut!((*mapped).num_buffers).write(NUM_BUFFERS as u64);
+        addr_of_mut!((*mapped).usize_size)
+            .write(size_of::<usize>() as u64);
+        addr_of_mut!((*mapped).uid).write(uid);
+        addr_of_mut!((*mapped).client_owned)
+            .write([const { AtomicBool::new(false) }; NUM_BUFFERS]);
+        addr_of_mut!((*mapped).client_len)
+            .write([const { AtomicUsize::new(0) }; NUM_BUFFERS]);
+        addr_of_mut!((*mapped).client_seq)
+            .write([const { AtomicU64::new(NO_SEQ) }; NUM_BUFFERS]);
+        addr_of_mut!((*mapped).cur_seq).write(AtomicU64::new(0));
+
+        // Chunks are left uninitialized, which is okay as they are marked
+        // as [`MaybeUninit`]
     }
 
     /// Get the raw backing memory pointer for the pipe
@@ -313,7 +335,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
                         // Construct a raw pointer to the first byte
                         bytes: UnsafeCell::raw_get(
-                            pipe.chunks[ii].0[0].as_ptr()
+                            pipe.chunks[ii].0.as_ptr().cast::<UnsafeCell<u8>>()
                         ),
                     };
                 }
@@ -326,6 +348,16 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Drop for SendPipe<CHUNK_SIZE, NUM_BUFFERS> {
     #[cfg(target_family = "unix")]
     fn drop(&mut self) {
+        if self.local {
+            // Free the heap allocation. Any `RecvPipe` opened on it must
+            // already be gone, see `RecvPipe::open_raw`
+            unsafe {
+                dealloc(self.mem_pipe as *mut u8,
+                    Layout::new::<RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>>());
+            }
+            return;
+        }
+
         unsafe {
             // Delete the file we created
             let cs = filename_from_uid(self.uid)
@@ -456,6 +488,9 @@ pub struct RecvPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
 
     /// Current sequence index we're looking for
     seq: AtomicU64,
+
+    /// Opened on memory we do not own, via [`RecvPipe::open_raw`]
+    local: bool,
 }
 
 unsafe impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Send for
@@ -531,18 +566,31 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Ok(RecvPipe {
             mem_pipe: mapped,
             seq:      AtomicU64::new(0),
+            local:    false,
         })
     }
-    
+
     /// Open a pipe with a given pointer
     #[cfg(target_family = "sushi_roll")]
     pub unsafe fn open(mapped: *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>)
             -> Result<Self> {
-        // Return a reference to the memory pipe
-        Ok(RecvPipe {
+        Ok(Self::open_raw(mapped))
+    }
+
+    /// Open a pipe on memory owned by someone else, typically
+    /// [`SendPipe::raw`] of a pipe from [`SendPipe::create_local`]
+    ///
+    /// # Safety
+    ///
+    /// `mapped` must point to an initialized pipe with matching constants,
+    /// and it must stay valid for as long as this `RecvPipe` exists
+    pub unsafe fn open_raw(mapped: *const RawMemPipe<CHUNK_SIZE, NUM_BUFFERS>)
+            -> Self {
+        RecvPipe {
             mem_pipe: mapped,
             seq:      AtomicU64::new(0),
-        })
+            local:    true,
+        }
     }
 
     /// Requests a ticket. By taking a ticket you are saying that you are ready
@@ -593,7 +641,8 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             // Get a slice to the data
             let data = unsafe {
                 core::slice::from_raw_parts(
-                    UnsafeCell::raw_get(pipe.chunks[ii].0[0].as_ptr()),
+                    UnsafeCell::raw_get(pipe.chunks[ii].0.as_ptr()
+                        .cast::<UnsafeCell<u8>>()),
                     length)
             };
 
@@ -624,7 +673,11 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
         Drop for RecvPipe<CHUNK_SIZE, NUM_BUFFERS> {
     #[cfg(target_family = "unix")]
     fn drop(&mut self) {
-        // Delete our file
+        // Memory from `open_raw` is not ours to unmap
+        if self.local {
+            return;
+        }
+
         // Unmap the memory we mapped
         unsafe {
             assert!(libc::munmap(self.mem_pipe as *mut _,
@@ -640,6 +693,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn pipe_config() -> Result<()> {
     // We should fail to make a pipe with a mismatched size
     let pipe = SendPipe::<1, 2>::create()?;
@@ -659,12 +713,14 @@ fn pipe_config() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn large_stack_config() -> Result<()> {
     let _pipe = SendPipe::< { 1024 * 1024 * 1024 }, 2>::create()?;
     Ok(())
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn toot() -> Result<()> {
     use std::time::Instant;
 
@@ -703,3 +759,76 @@ fn toot() -> Result<()> {
     Ok(())
 }
 
+/// Several readers sharing one pipe. This runs on a local pipe so it works
+/// under Miri, where it shrinks to a size that can be swept over many seeds
+/// with a high preemption rate. Miri's race detector then flags any chunk
+/// read that is not ordered after the write that produced it.
+#[test]
+fn multi_reader() -> Result<()> {
+    use std::sync::atomic::AtomicU8;
+
+    #[cfg(miri)]
+    const READERS: usize = 2;
+    #[cfg(miri)]
+    const MESSAGES: u64 = 24;
+    #[cfg(miri)]
+    const POLL_LIMIT: u64 = 20_000;
+
+    #[cfg(not(miri))]
+    const READERS: usize = 4;
+    #[cfg(not(miri))]
+    const MESSAGES: u64 = 200_000;
+    #[cfg(not(miri))]
+    const POLL_LIMIT: u64 = 200_000_000;
+
+    // A stranded pipe leaves the sender spinning inside the library where no
+    // assertion can reach it, so a reader's failure must end the process
+    std::panic::set_hook(Box::new(|info| {
+        eprintln!("{info}");
+        std::process::exit(101);
+    }));
+
+    let mut tx = SendPipe::<8, 2>::create_local()?;
+    let rx = unsafe { RecvPipe::<8, 2>::open_raw(tx.raw()) };
+    let seen: Vec<AtomicU8> =
+        (0..MESSAGES).map(|_| AtomicU8::new(0)).collect();
+    let delivered = AtomicU64::new(0);
+
+    std::thread::scope(|s| {
+        for _ in 0..READERS {
+            let (rx, seen, delivered) = (&rx, &seen, &delivered);
+            s.spawn(move || {
+                let mut ticket = rx.request_ticket();
+                let mut idle = 0u64;
+                while delivered.load(Ordering::Relaxed) < MESSAGES {
+                    let (next, res) = rx.try_recv(ticket, |d| -> Result<u64> {
+                        Ok(u64::from_le_bytes(d.try_into().unwrap()))
+                    });
+                    ticket = next;
+                    match res {
+                        Some(Ok((seq, payload))) => {
+                            assert_eq!(seq, payload, "wrong message");
+                            assert_eq!(seen[seq as usize]
+                                .fetch_add(1, Ordering::Relaxed), 0,
+                                "message {seq} delivered twice");
+                            delivered.fetch_add(1, Ordering::Relaxed);
+                            idle = 0;
+                        }
+                        Some(Err(_)) => unreachable!(),
+                        None => {
+                            idle += 1;
+                            assert!(idle < POLL_LIMIT, "reader hung");
+                        }
+                    }
+                }
+            });
+        }
+
+        for i in 0..MESSAGES {
+            tx.alloc_buffer(true).send(i.to_le_bytes());
+        }
+    });
+
+    assert_eq!(delivered.load(Ordering::Relaxed), MESSAGES);
+    Ok(())
+}
