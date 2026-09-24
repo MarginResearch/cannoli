@@ -92,7 +92,11 @@ pub struct Chunk<const CHUNK_SIZE: usize>(
     [MaybeUninit<UnsafeCell<u8>>; CHUNK_SIZE]);
 
 /// Magic value put at the header of memory pipe structures
-const MEMPIPE_MAGIC: u64 = 0x91d021239b73bc57;
+/// Previous: `0x91d021239b73bc57`
+const MEMPIPE_MAGIC: u64 = 0x5e0f2b7c1d9a4863;
+
+/// Initial `client_seq` of every buffer, never a valid ticket
+const NO_SEQ: u64 = u64::MAX;
 
 /// A memory pipe which uses `CHUNK_SIZE` byte chunks and `NUM_BUFFERS` for
 /// transferring memory between processes.
@@ -124,12 +128,12 @@ pub struct RawMemPipe<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> {
     client_owned: [AtomicBool; NUM_BUFFERS],
 
     /// Holds the length of a transferred buffer. This must be populated prior
-    /// to `client_owned` being set to `true`, and must be ordered correctly
-    /// on the processor
+    /// to `client_seq`, which publishes it
     client_len: [AtomicUsize; NUM_BUFFERS],
 
-    /// The sequence number for a given buffer, must be set prior to
-    /// `client_owned` and ordered correctly on the processor
+    /// The sequence number for a given buffer. Set last, with release
+    /// semantics, after the chunk, `client_len` and `client_owned`. Starts at
+    /// [`NO_SEQ`], which is never a ticket.
     client_seq: [AtomicU64; NUM_BUFFERS],
 
     /// Current sequence number, incremented by one to get a sequential ID to
@@ -257,7 +261,7 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
             addr_of_mut!((*mapped).client_len)
                 .write([const { AtomicUsize::new(0) }; NUM_BUFFERS]);
             addr_of_mut!((*mapped).client_seq)
-                .write([const { AtomicU64::new(0) }; NUM_BUFFERS]);
+                .write([const { AtomicU64::new(NO_SEQ) }; NUM_BUFFERS]);
             addr_of_mut!((*mapped).cur_seq).write(AtomicU64::new(0));
 
             // Chunks are left uninitialized, which is okay as they are marked
@@ -421,13 +425,15 @@ impl<'a, const CHUNK_SIZE: usize, const NUM_BUFFERS: usize> Drop for
         self.mem_pipe.client_len[self.idx].store(self.written,
             Ordering::Relaxed);
 
-        // Allocate a unique sequence ID for this buffer
-        let seq_id = self.mem_pipe.cur_seq.fetch_add(1, Ordering::Relaxed);
-        self.mem_pipe.client_seq[self.idx].store(seq_id, Ordering::Relaxed);
+        // Flip ownership. Receivers only look at a buffer once its sequence
+        // matches their ticket, which is published below
+        self.mem_pipe.client_owned[self.idx].store(true, Ordering::Relaxed);
 
-        // Flip ownership, using release semantics to make sure all writes have
-        // become visible to the core we're sending to
-        self.mem_pipe.client_owned[self.idx].store(true, Ordering::Release);
+        // Allocate a unique sequence ID for this buffer and publish it, using
+        // release semantics to make sure all writes have become visible to
+        // the core we're sending to
+        let seq_id = self.mem_pipe.cur_seq.fetch_add(1, Ordering::Relaxed);
+        self.mem_pipe.client_seq[self.idx].store(seq_id, Ordering::Release);
 
         if self.blocking {
             // Wait for the pipe to be owned by us again
@@ -570,15 +576,16 @@ impl<const CHUNK_SIZE: usize, const NUM_BUFFERS: usize>
 
         // Look for a filled in buffer
         for ii in 0..NUM_BUFFERS {
-            // If it's not client owned, skip it
-            if !pipe.client_owned[ii].load(Ordering::Acquire) {
+            // Look for our sequence. It's stored last, so once it matches
+            // the buffer is published and owned by us. Checking ownership
+            // instead would let a `true` from an older publication of this
+            // buffer pass
+            if ticket.0 != pipe.client_seq[ii].load(Ordering::Acquire) {
                 continue;
             }
 
-            // It's client owned, make sure it's the sequence we expect
-            if ticket.0 != pipe.client_seq[ii].load(Ordering::Relaxed) {
-                continue;
-            }
+            debug_assert!(pipe.client_owned[ii].load(Ordering::Relaxed),
+                "Buffer with our sequence is not client-owned");
 
             // Got the sequence we wanted, get the length
             let length = pipe.client_len[ii].load(Ordering::Relaxed);
