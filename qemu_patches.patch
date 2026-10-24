@@ -896,7 +896,6 @@ index 3708405be8..1f41402baf 100644
      /* Internal CPU feature flags.  */
      uint64_t features;
 +
-+    const tricore_def_t *cpu_model;
 +    void *irq[8];
 +    struct QEMUTimer *timer; /* Internal timer */
  } CPUTriCoreState;
